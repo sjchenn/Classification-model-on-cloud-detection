@@ -1,0 +1,92 @@
+---
+title: "CVmaster"
+author: "Qin He"
+date: "10/31/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# this is example
+```{r}
+library(randomForest)
+library(datasets)
+library(caret)
+data<-iris
+str(data)
+data$Species <- as.factor(data$Species)
+set.seed(222)
+ind <- sample(2, nrow(data), replace = TRUE, prob = c(0.7, 0.3))
+train <- data[ind==1,]
+test <- data[ind==2,]
+rf <- randomForest(Species~., data=train, proximity=TRUE)
+p1 <- predict(rf, train)
+predict(rf, test) == test$Species
+```
+
+```{r}
+# 
+CVmaster = function(classifier, features,labels,nfold = 5){
+  folds <- createFolds(labels, k = nfold)
+  fold_errors = c()
+  for(fold in folds){
+     train = features[-fold,]
+     test = features[fold,]
+     rf = randomForest(Species~., data=train, proximity=TRUE)
+     predict_label = predict(classifier,test)
+     error = sum(predict_label == labels[fold])/length(labels)
+     fold_errors = c(fold_errors,error)
+  }
+  return(mean(fold_errors))
+}
+
+CVmaster(rf,train[,1:5],train[,5])
+
+
+
+
+
+```
+
+```{r}
+fitControl <- trainControl(## 10-fold CV
+                           method = "cv",
+                           number = 10)
+                           ## repeated ten times
+                           #repeats = 10)
+gbmFit1 <- train(Species ~ ., data = train, 
+                 method = "gbm", 
+                 trControl = fitControl,
+                 ## This last option is actually one
+                 ## for gbm() that passes through
+                 verbose = FALSE)
+```
+
+```{r}
+gbmFit1$results$Accuracy
+```
+```{r}
+CVmaster = function(classifier,data,nfold = 10){
+  fitControl <- trainControl(## 10-fold CV
+                           method = "cv",
+                           number = nfold,
+                           )
+  #training_data = cbind(features,labels)
+  gbmFit1 <- train(Species ~ ., data = data, 
+                 method = classifier, 
+                 trControl = fitControl,
+                 ## This last option is actually one
+                 ## for gbm() that passes through
+                 verbose = FALSE)
+  return(mean(gbmFit1$results$Accuracy))
+}
+CV_loss =CVmaster("gbm",train,5)
+```
+
+```{r}
+
+```
+
