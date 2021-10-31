@@ -224,3 +224,24 @@ ggplot(aes(x=rownames(VI),y=Overall),data=VI)+
               #col="red", lty=2)
 ```
 
+## (d)
+```{r}
+library(caret)
+set.seed(521)
+fitControl <- trainControl(## 10-fold CV
+                           method = "cv",
+                           number = 5,
+                           )
+  #training_data = cbind(features,labels)
+log_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data, 
+                 method = "glm", 
+                 trControl = fitControl,
+                 family = "binomial"
+                 )
+svm_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data, 
+                 method = "svmLinear", 
+                 trControl = fitControl,
+                 preProcess = c("center","scale"))
+                 
+
+```
