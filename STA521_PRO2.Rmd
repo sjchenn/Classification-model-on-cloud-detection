@@ -13,6 +13,9 @@ library(reshape)
 library(GGally)
 library(DiscriMiner)
 library(gridExtra)
+library(caret)
+library(glmnet)
+library(corrplot)
 ```
 
 
@@ -43,7 +46,7 @@ According to the heat map, we can observe patterns between xy coordinates and ex
 ```{r}
 #summarize the data
 table(image$expertlabels)
-ggplot(data=image,aes(x=x,y=y,fill=expertlabels))+
+ggplot(data=image,aes(x=x,y=y,fill=expert_labels))+
   geom_tile()+
   ggtitle('Heat Map With Exexpert Labels')
 ```
@@ -73,24 +76,24 @@ We suspects that the underlying relationship between expert labels and individua
 
 ```{r}
 for (i in 1:ncol(imagefeature)){
-  print(corRatio(imagefeature[,i],image$expertlabels))
+  print(corRatio(imagefeature[,i],image$expert_labels))
 }
 ```
 According to visualization, distribution of features with highest five correlation ratio under three labels are distinct meaning those features are valuable when we creating the model. 
 ```{r}
 #change expertlabels into factors
 image <- image %>% 
-  mutate(expertlabels=as.factor(expertlabels))
+  mutate(expertlabels=as.factor(expert_labels))
 #visualization on correlations
-g1 <- ggplot(image,aes(x=NDAI,fill=expertlabels))+
+g1 <- ggplot(image,aes(x=NDAI,fill=expert_labels))+
     geom_density(alpha=0.3)
-g2 <- ggplot(image,aes(x=SD,fill=expertlabels))+
+g2 <- ggplot(image,aes(x=SD,fill=expert_labels))+
     geom_density(alpha=0.3)
-g3 <- ggplot(image,aes(x=CORR,fill=expertlabels))+
+g3 <- ggplot(image,aes(x=CORR,fill=expert_labels))+
     geom_density(alpha=0.3)
-g4 <- ggplot(image,aes(x=AF,fill=expertlabels))+
+g4 <- ggplot(image,aes(x=AF,fill=expert_labels))+
     geom_density(alpha=0.3)
-g5 <- ggplot(image,aes(x=AN,fill=expertlabels))+
+g5 <- ggplot(image,aes(x=AN,fill=expert_labels))+
     geom_density(alpha=0.3)
 grid.arrange(g1,g2,g3,g4,g5,ncol=2)
 ```
@@ -100,20 +103,20 @@ In addition, we want to see the differences between two classes (cloud,no cloud)
 ```{r}
 #specificdf only contains two classes and three features
 specificdf <- image %>% 
-  select(CORR,NDAI,SD,expertlabels) %>% 
-  filter(expertlabels==1|expertlabels==-1)
+  select(CORR,NDAI,SD,expert_labels) %>% 
+  filter(expert_labels==1|expert_labels==-1)
 ```
 
 ```{r}
-sp1 <- ggplot(specificdf,aes(x=CORR,fill=expertlabels))+
+sp1 <- ggplot(specificdf,aes(x=CORR,fill=expert_labels))+
   geom_density(alpha=0.3)
-sp11 <- sp1+facet_wrap(expertlabels~.)
-sp2 <- ggplot(specificdf,aes(x=NDAI,fill=expertlabels))+
+sp11 <- sp1+facet_wrap(expert_labels~.)
+sp2 <- ggplot(specificdf,aes(x=NDAI,fill=expert_labels))+
   geom_density(alpha=0.3)
-sp22 <- sp2+facet_wrap(expertlabels~.)
-sp3 <- ggplot(specificdf,aes(x=SD,fill=expertlabels))+
+sp22 <- sp2+facet_wrap(expert_labels~.)
+sp3 <- ggplot(specificdf,aes(x=SD,fill=expert_labels))+
   geom_density(alpha=0.3)
-sp33 <- sp3+facet_wrap(expertlabels~.)
+sp33 <- sp3+facet_wrap(expert_labels~.)
 
 grid.arrange(sp11,sp22,sp33)
 ```
@@ -123,7 +126,7 @@ According to summary statistics for features CORR, NDAI and SD grouped by expert
 ```{r}
 #quant
 specificdf %>% 
-  group_by(expertlabels) %>% 
+  group_by(expert_labels) %>% 
   summarize(meanCORR = mean(CORR), meanNDAI= mean(NDAI), meanSD= mean(SD),
             sdCORR = sd(CORR), sdNDAI= sd(NDAI), sdSD= sd(SD))
 ```
@@ -167,8 +170,6 @@ train_data = data%>%filter(block_index %in% train_index)
 test_data = data%>%filter(!(block_index %in% train_index))
 validation_index = sample(train_index,10)
 validation_data = train_data%>%filter(block_index %in%validation_index)
-
-
 ```
 
 
@@ -181,3 +182,45 @@ sum(test_data$expert_labels == -1)/length(test_data$expert_labels)
 sum(validation_data$expert_labels == -1)/length(test_data$expert_labels)
 1 - sum(validation_data$expert_labels == -1)/length(test_data$expert_labels)
 ```
+
+# c
+In order to check important variables associated with expert_labels, we can use a logistic regression. 
+```{r}
+featuredf <- select(train_data,-c(x,y,block_y,block_x,block_index))
+#label = 1 refers to cloud, 0 refers to no cloud
+featuredf$expert_labels <- ifelse(featuredf$expert_labels==1,1,0)
+
+logit <- glm(expert_labels~.,data=featuredf,family='binomial')
+#xtest <- data.matrix(subset(featuredf,select=-c(expert_labels)))
+#ytest <- data.matrix(subset(featuredf,select=c(expert_labels)))
+#logit <- glmnet(xtest,ytest,family='binomial',alpha=1,lambda=NULL)
+```
+
+The logistic model summary output for all features have p value smaller than $0.05$. 
+Nevertheless, we can use variable importance function to perform feature selection. As the result of the varImp, we have the highest four variable importance value which are features: NDAI, SD, CORR and DF. 
+```{r}
+summary(logit)
+```
+
+The visualization of correlation matrix conveys the message that the information from different angles are high correlated, which means they are redundant variables. Furthermore, although variable DF shows descent variable importance value, it has a realtively low (close to zero) correlation with expert labels, thus we will exclude the variable from future modeling. 
+```{r}
+cor(featuredf)
+corrplot(cor(featuredf))
+```
+
+
+```{r}
+theme_update(plot.title = element_text(hjust = 0.5))
+VI <- varImp(logit,scale=FALSE)
+ggplot(aes(x=rownames(VI),y=Overall),data=VI)+
+  geom_point()+
+  ggtitle('Variable Importance Plot')
+```
+
+```{r}
+#ggplot(featuredf, aes(x=CORR, y=expert_labels)) + 
+  #geom_point(alpha=.5) +
+  #stat_smooth(method="glm", se=FALSE, method.args = list(family=binomial),
+              #col="red", lty=2)
+```
+
