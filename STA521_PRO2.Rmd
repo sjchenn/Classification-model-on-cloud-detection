@@ -202,7 +202,7 @@ Nevertheless, we can use variable importance function to perform feature selecti
 summary(logit)
 ```
 
-The visualization of correlation matrix conveys the message that the information from different angles are high correlated, which means they are redundant variables. Furthermore, although variable DF shows descent variable importance value, it has a realtively low (close to zero) correlation with expert labels, thus we will exclude the variable from future modeling. 
+The visualization of correlation matrix conveys the message that the information from different angles are high correlated, which means they are redundant variables. Furthermore, although variable DF shows descent variable importance value, it has a relatively low (close to zero) correlation with expert labels, thus we will exclude the variable from future modeling. 
 ```{r}
 cor(featuredf)
 corrplot(cor(featuredf))
