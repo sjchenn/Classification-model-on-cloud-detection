@@ -9,6 +9,9 @@ output: html_document
 library(ggplot2)
 library(tidyverse)
 library(reshape)
+library(GGally)
+library(DiscriMiner)
+library(gridExtra)
 ```
 
 
@@ -42,6 +45,83 @@ ggplot(data=image,aes(x=x,y=y,fill=expertlabels))+
   ggtitle('Heat Map With Exexpert Labels')
 ```
 
+## (c) Perform visual and quantitative and visual EDA
+### pairwise relationships
+```{r}
+#image %>% 
+  #select(NDAI,SD,CORR,DF,CF,BF,AF,AN) %>% 
+  #ggpairs()
+```
+Among all eight feature correlation, we found that there are seven pairs correlations between features are higher than $0.7$. 
+```{r}
+imagefeature <- image %>% 
+  select(NDAI,SD,CORR,DF,CF,BF,AF,AN)
+feature_cor <- cor(imagefeature)
+for (i in 1:nrow(feature_cor)){
+    correlations <-  which((abs(feature_cor[i,i:ncol(feature_cor)]) > 0.7) & (feature_cor[i,i:ncol(feature_cor)] != 1))
+    if(length(correlations)> 0){
+      lapply(correlations,FUN =  function(x) (cat(paste(colnames(feature_cor)[i], "with",colnames(feature_cor)[x]), "\n")))
+    }
+  }
+```
+### pairwise relationships between expert labels and individual features.
+
+We suspects that the underlying relationship between expert labels and individual features are not linear. For better estimation on correlation between continuous variable and categorical variable, we used correlation ration. According to the quantitative result, NDAI and CORR have highest correlation with expert labels. SD togther with radiance angle AF and AN approximately have equal correlation with expert labels that is around $0.15$.
+
+```{r}
+for (i in 1:ncol(imagefeature)){
+  print(corRatio(imagefeature[,i],image$expertlabels))
+}
+```
+According to visualization, distribution of features with highest five correlation ratio under three labels are distinct meaning those features are valuable when we creating the model. 
+```{r}
+#change expertlabels into factors
+image <- image %>% 
+  mutate(expertlabels=as.factor(expertlabels))
+#visualization on correlations
+g1 <- ggplot(image,aes(x=NDAI,fill=expertlabels))+
+    geom_density(alpha=0.3)
+g2 <- ggplot(image,aes(x=SD,fill=expertlabels))+
+    geom_density(alpha=0.3)
+g3 <- ggplot(image,aes(x=CORR,fill=expertlabels))+
+    geom_density(alpha=0.3)
+g4 <- ggplot(image,aes(x=AF,fill=expertlabels))+
+    geom_density(alpha=0.3)
+g5 <- ggplot(image,aes(x=AN,fill=expertlabels))+
+    geom_density(alpha=0.3)
+grid.arrange(g1,g2,g3,g4,g5,ncol=2)
+```
+
+In addition, we want to see the differences between two classes (cloud,no cloud) based on features(CORR,NADI and SD).
+
+```{r}
+#specificdf only contains two classes and three features
+specificdf <- image %>% 
+  select(CORR,NDAI,SD,expertlabels) %>% 
+  filter(expertlabels==1|expertlabels==-1)
+```
+
+```{r}
+sp1 <- ggplot(specificdf,aes(x=CORR,fill=expertlabels))+
+  geom_density(alpha=0.3)
+sp11 <- sp1+facet_wrap(expertlabels~.)
+sp2 <- ggplot(specificdf,aes(x=NDAI,fill=expertlabels))+
+  geom_density(alpha=0.3)
+sp22 <- sp2+facet_wrap(expertlabels~.)
+sp3 <- ggplot(specificdf,aes(x=SD,fill=expertlabels))+
+  geom_density(alpha=0.3)
+sp33 <- sp3+facet_wrap(expertlabels~.)
+
+grid.arrange(sp11,sp22,sp33)
+```
+According to summary statistics for features CORR, NDAI and SD grouped by expert labels, for pixels labeled as cloud, on average, the pixel data point has higher CORR, NDAI and SD. This fact agrees with our previous visualization which mode of three features in cloud group are statistically larger than modes in no cloud group. 
+```{r}
+#quant
+specificdf %>% 
+  group_by(expertlabels) %>% 
+  summarize(meanCORR = mean(CORR), meanNDAI= mean(NDAI), meanSD= mean(SD),
+            sdCORR = sd(CORR), sdNDAI= sd(NDAI), sdSD= sd(SD))
+```
 
 
 # 2 Preparation
