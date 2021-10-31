@@ -189,16 +189,22 @@ train_data$expert_labels = as.factor(train_data$expert_labels)
 ```
 
 ```{r}
+library(caret)
+set.seed(521)
 fitControl <- trainControl(## 10-fold CV
                            method = "cv",
-                           number = 10,
+                           number = 5,
                            )
   #training_data = cbind(features,labels)
-gbmFit1 <- train(expert_labels ~ ., data = train_data, 
-                 method = "plr", 
-                 trControl = fitControl
-                 ## This last option is actually one
-                 ## for gbm() that passes through
+log_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data, 
+                 method = "glm", 
+                 trControl = fitControl,
+                 family = "binomial"
                  )
+svm_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data, 
+                 method = "svmLinear", 
+                 trControl = fitControl,
+                 preProcess = c("center","scale"))
+                 
 ```
 
