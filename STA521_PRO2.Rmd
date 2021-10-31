@@ -7,8 +7,6 @@ output: html_document
 
 ```{r}
 library(tidyverse)
-```
-
 library(ggplot2)
 library(tidyverse)
 library(reshape)
@@ -162,7 +160,9 @@ sp33 <- sp3+facet_wrap(expertlabels~.)
 
 grid.arrange(sp11,sp22,sp33)
 ```
+
 According to summary statistics for features CORR, NDAI and SD grouped by expert labels, for pixels labeled as cloud, on average, the pixel data point has higher CORR, NDAI and SD. This fact agrees with our previous visualization which mode of three features in cloud group are statistically larger than modes in no cloud group. 
+
 ```{r}
 #quant
 specificdf %>% 
