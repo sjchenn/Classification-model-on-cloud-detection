@@ -174,10 +174,31 @@ validation_data = train_data%>%filter(block_index %in%validation_index)
 
 
 # b 
+
 ```{r}
 # test classifications error 
 sum(test_data$expert_labels == -1)/length(test_data$expert_labels)
 # validation classifications error
 sum(validation_data$expert_labels == -1)/length(test_data$expert_labels)
+# The classification is reversed as error is below 0.5
 1 - sum(validation_data$expert_labels == -1)/length(test_data$expert_labels)
 ```
+
+```{r}
+train_data$expert_labels = as.factor(train_data$expert_labels)
+```
+
+```{r}
+fitControl <- trainControl(## 10-fold CV
+                           method = "cv",
+                           number = 10,
+                           )
+  #training_data = cbind(features,labels)
+gbmFit1 <- train(expert_labels ~ ., data = train_data, 
+                 method = "plr", 
+                 trControl = fitControl
+                 ## This last option is actually one
+                 ## for gbm() that passes through
+                 )
+```
+
