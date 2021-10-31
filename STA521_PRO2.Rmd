@@ -6,15 +6,47 @@ output: html_document
 ---
 
 ```{r}
+library(ggplot2)
+library(tidyverse)
+library(reshape)
+```
+
+
+#1 Data Collection and Exploration
+
+```{r}
 #load data
 image1 <- read.csv('imagem1.txt',sep='',header=FALSE)
 image2 <- read.csv('imagem2.txt', sep='',header=FALSE)
 image3 <- read.csv('imagem3.txt', sep='',header=FALSE)
-vcol <- c('y','x','expert labels','NDAI','SD','CORR','DF','CF','BF','AF','AN')
+vcol <- c('y','x','expertlabels','NDAI','SD','CORR','DF','CF','BF','AF','AN')
 
 
 colnames(image1) <- vcol
 colnames(image2) <- vcol
 colnames(image3) <- vcol
+```
+
+```{r}
+#combine all three datasets
+image <- rbind(image1,image2,image3)
+```
+
+## (b)
+According to the heat map, we can observe patterns between xy coordinates and expert labels. The majority of unlabeled pixels are around x coordinates near 300. Furthermore, we can clearly see that the closer the geological location of the pixels are, they are more likely to share same label. Therefore, our assumption of independent and identical distributed doesn't hold for this data set. 
+```{r}
+#summarize the data
+table(image$expertlabels)
+ggplot(data=image,aes(x=x,y=y,fill=expertlabels))+
+  geom_tile()+
+  ggtitle('Heat Map With Exexpert Labels')
+```
+
+
+
+# 2 Preparation
+
+```{r}
+
 ```
 
