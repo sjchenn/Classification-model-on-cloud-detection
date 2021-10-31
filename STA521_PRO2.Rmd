@@ -171,3 +171,13 @@ validation_data = train_data%>%filter(block_index %in%validation_index)
 
 ```
 
+
+
+# b 
+```{r}
+# test classifications error 
+sum(test_data$expert_labels == -1)/length(test_data$expert_labels)
+# validation classifications error
+sum(validation_data$expert_labels == -1)/length(test_data$expert_labels)
+1 - sum(validation_data$expert_labels == -1)/length(test_data$expert_labels)
+```
