@@ -6,6 +6,9 @@ output: html_document
 ---
 
 ```{r}
+library(tidyverse)
+```
+
 library(ggplot2)
 library(tidyverse)
 library(reshape)
@@ -22,7 +25,9 @@ library(gridExtra)
 image1 <- read.csv('imagem1.txt',sep='',header=FALSE)
 image2 <- read.csv('imagem2.txt', sep='',header=FALSE)
 image3 <- read.csv('imagem3.txt', sep='',header=FALSE)
-vcol <- c('y','x','expertlabels','NDAI','SD','CORR','DF','CF','BF','AF','AN')
+
+vcol <- c('y','x','expert_labels','NDAI','SD','CORR','DF','CF','BF','AF','AN')
+
 
 
 colnames(image1) <- vcol
@@ -31,7 +36,50 @@ colnames(image3) <- vcol
 ```
 
 ```{r}
-#combine all three datasets
+table(image1$`expert_labels`)
+table(image2$`expert_labels`)
+table(image3$`expert_labels`)
+image1
+```
+
+```{r}
+df <- rbind(image1,image2,image3)
+data = df%>%filter(expert_labels != 0)
+```
+
+```{r}
+
+# split along y 
+data <- data%>%mutate(block_y = ((y-1)%%10)+1)
+train_index = sample(1:10,8)
+train_data = data%>%filter(block_y %in% train_index)
+test_data = data%>%filter(!(block_y %in% train_index))
+validation_index = sample(train_index,1)
+validation_data = train_data%>%filter(block_y %in%validation_index)
+train_data
+
+# split along x
+data = df%>%filter(expert_labels != 0)
+data <- data%>%mutate(block_x = ((x-64)%%10)+1)
+train_index = sample(1:10,8)
+train_data = data%>%filter(block_x %in% train_index)
+test_data = data%>%filter(!(block_x %in% train_index))
+validation_index = sample(train_index,1)
+validation_data = train_data%>%filter(block_x %in%validation_index)
+
+
+
+# block separation
+data = df%>%filter(expert_labels != 0)
+data <- data%>%mutate(block_y = ((y-1)%%10)+1,block_x = ((x-64)%%10)+1)%>%mutate(block_index = (block_y-1)*10+block_x)
+table(data$block_index)
+train_index = sample(1:100,80)
+train_data = data%>%filter(block_index %in% train_index)
+test_data = data%>%filter(!(block_index %in% train_index))
+validation_index = sample(train_index,10)
+validation_data = train_data%>%filter(block_index %in%validation_index)
+
+# combine all three datasets
 image <- rbind(image1,image2,image3)
 ```
 
