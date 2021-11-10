@@ -245,3 +245,53 @@ svm_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data,
                  
 
 ```
+
+
+
+```{r experiment}
+n = nrow(data)
+mini_data_index = sample(c(1:n), 10000)
+mini_data = data[mini_data_index,]
+mini_data$expert_labels = as.factor(mini_data$expert_labels)
+
+#mini_data = df%>%filter(expert_labels != 0)
+mini_data <- mini_data%>%mutate(block_y = ((y-1)%%10)+1,block_x = ((x-64)%%10)+1)%>%mutate(block_index = (block_y-1)*10+block_x)
+table(mini_data$block_index)
+train_index = sample(1:100,80)
+train_data = mini_data%>%filter(block_index %in% train_index)
+test_data = mini_data%>%filter(!(block_index %in% train_index))
+validation_index = sample(train_index,10)
+validation_data = train_data%>%filter(block_index %in%validation_index)
+
+table(train_data$expert_labels)
+
+mini_data
+```
+
+
+
+```{r}
+set.seed(521)
+fitControl <- trainControl(## 10-fold CV
+                           method = "cv",
+                           number = 10
+                           )
+svm_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data, 
+                 method = "svmLinear", 
+                 trControl = fitControl,
+                 tuneGrid = expand.grid(C = seq(0.2, 2, length = 5)),
+                 preProcess = c("center","scale"))
+```
+
+```{r}
+summary(svm_fit)
+svm_fit$results
+predict_val = predict(svm_fit,newdata = test_data)
+sum(predict_val == test_data$expert_labels)/nrow(test_data)
+```
+
+```{r}
+validation_data$expert_labels
+predict_val
+```
+
