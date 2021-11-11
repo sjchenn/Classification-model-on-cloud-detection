@@ -295,3 +295,55 @@ validation_data$expert_labels
 predict_val
 ```
 
+```{r}
+#try lda and qda on the whole dataset
+data$expert_labels <- ifelse(data$expert_labels==1,1,0)
+data <- data%>%mutate(block_y = ((y-1)%%10)+1,block_x = ((x-64)%%10)+1)%>%mutate(block_index = (block_y-1)*10+block_x)
+table(data$block_index)
+train_index = sample(1:100,80)
+train_data = data%>%filter(block_index %in% train_index)
+test_data = data%>%filter(!(block_index %in% train_index))
+validation_index = sample(train_index,10)
+validation_data = train_data%>%filter(block_index %in%validation_index)
+```
+
+```{r}
+fitControl <- trainControl(## 10-fold CV
+                           method = "cv",
+                           number = 10
+                           )
+train_data$expert_labels <- as.factor(train_data$expert_labels)
+lda_fit <- train(expert_labels ~ NDAI + SD + CORR, data = train_data, 
+                 method = "lda", 
+                 trControl = fitControl,
+                 #tuneGrid = expand.grid(C = seq(0.2, 2, length = 5)),
+                 preProcess = c("center","scale"))
+
+```
+
+```{r}
+lda_fit
+```
+
+
+```{r}
+fitControl <- trainControl(## 10-fold CV
+                           method = "cv",
+                           number = 10,
+                           repeats = 3
+                           )
+test_data$expert_labels <- as.factor(test_data$expert_labels)
+train_data$expert_labels <- as.factor(train_data$expert_labels)
+qda_fit <- train(expert_labels ~ NDAI + SD + CORR, data = train_data, 
+                 method = "qda", 
+                 trControl = fitControl,
+                 #tuneGrid = expand.grid(C = seq(0.2, 2, length = 5)),
+                 preProcess = c("center","scale"))
+```
+
+```{r}
+rs <- predict(qda_fit,test_data)
+sum(rs == test_data$expert_labels)/ nrow(test_data)
+```
+
+
