@@ -16,6 +16,7 @@ library(gridExtra)
 library(caret)
 library(glmnet)
 library(corrplot)
+library(pROC)
 ```
 
 
@@ -163,6 +164,7 @@ validation_data = train_data%>%filter(block_x %in%validation_index)
 
 # block separation
 data = df%>%filter(expert_labels != 0)
+data$expert_labels = ifelse(data$expert_labels==1,1,0)
 data <- data%>%mutate(block_y = ((y-1)%%10)+1,block_x = ((x-64)%%10)+1)%>%mutate(block_index = (block_y-1)*10+block_x)
 table(data$block_index)
 train_index = sample(1:100,80)
@@ -225,30 +227,37 @@ ggplot(aes(x=rownames(VI),y=Overall),data=VI)+
 ```
 
 ## (d)
-```{r}
-library(caret)
+```{r cv function}
 set.seed(521)
-fitControl <- trainControl(## 10-fold CV
+fitControl <- trainControl(## 5-fold CV
                            method = "cv",
                            number = 5,
                            )
-  #training_data = cbind(features,labels)
-log_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data, 
-                 method = "glm", 
-                 trControl = fitControl,
-                 family = "binomial"
-                 )
-svm_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data, 
-                 method = "svmLinear", 
-                 trControl = fitControl,
-                 preProcess = c("center","scale"))
+#training_data = cbind(features,labels
+# svm_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data, 
+#                  method = "svmLinear", 
+#                  trControl = fitControl,
+#                  preProcess = c("center","scale"))
                  
 
 ```
 
 
+#3 Modeling
+
+## a
+```{r}
+#run logistic on the whole training dataset using block train test split
+log_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data, 
+                 method = "glm", 
+                 trControl = fitControl,
+                 family = "binomial"
+                 )
+```
+
 
 ```{r experiment}
+# this mini data is only for experiment
 n = nrow(data)
 mini_data_index = sample(c(1:n), 10000)
 mini_data = data[mini_data_index,]
@@ -334,7 +343,6 @@ rf_fit$results
 ```
 
 ```{r}
-
 predicted = predict(rf_fit,test_data)
 sum(predicted == test_data$expert_labels)/nrow(test_data)
 ```
@@ -390,4 +398,9 @@ rs <- predict(qda_fit,test_data)
 sum(rs == test_data$expert_labels)/ nrow(test_data)
 ```
 
+## b ROC curves
+```{r}
+#ROC for logistic
+test_prob = predict(logit,)
+```
 
