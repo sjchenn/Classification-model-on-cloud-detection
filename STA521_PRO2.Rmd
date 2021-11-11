@@ -294,6 +294,50 @@ sum(predict_val == test_data$expert_labels)/nrow(test_data)
 validation_data$expert_labels
 predict_val
 ```
+```{r}
+control <- trainControl(method='repeatedcv', 
+                        number=10, 
+                        repeats=3,
+                        search = 'random')
+rf_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data, 
+                 method = "rf", 
+                 metric = 'Accuracy',
+                   #tuneLength  = 15, 
+                 #  trControl = control
+                )
+
+```
+
+```{r}
+library(randomForest)
+rf_fit <- randomForest(expert_labels ~ NDAI + SD +CORR + DF , data = train_data, ntree = 20, mtry = 4, importance = T)
+plot(rf_fit)
+
+```
+```{r}
+control <- trainControl(method='cv', 
+                        number=10, 
+                        repeats=3,
+                        search = 'random')
+rf_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data, 
+                 method = "nnet", 
+                 metric = 'Accuracy',
+                   #tuneLength  = 15, 
+                  trControl = control
+              #  linout = T
+                )
+```
+
+
+```{r}
+rf_fit$results
+```
+
+```{r}
+
+predicted = predict(rf_fit,test_data)
+sum(predicted == test_data$expert_labels)/nrow(test_data)
+```
 
 ```{r}
 #try lda and qda on the whole dataset
