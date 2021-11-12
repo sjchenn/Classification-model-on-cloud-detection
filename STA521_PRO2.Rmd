@@ -392,13 +392,11 @@ CVmaster = function(classifier,features,labels,nfold = 5){
      set = cbind(train_feature,train_label)
      t = cbind(test_feature,test_label)
      modellda = lda(train_label ~ ., data=set)
-     predict_label = predict(modellda,data=t)
+     predict_label = predict(modellda,newdata=t)
      print(length(predict_label$class))
-     error = (sum(predict_label$class == test_label))/length(test_label)
-     #print(predict_label$class )
-     #print(unique(test_label))
+     error = 1- (sum(predict_label$class == test_label))/length(test_label)
      fold_errors = c(fold_errors,error)
-     print(paste0('This is fold', i))
+     print(paste0('This is fold ', i))
      i = i+1
   }
   return(fold_errors)
@@ -425,27 +423,7 @@ t = test_data %>%
 
 ```
 
-```{r}
-folds <- createFolds(labels[[1]], k = 5)
-fold_errors =c()
-i =0
-for(fold in folds){
-     train_feature = features[-fold,]
-     train_label = as.factor(labels[-fold,])
-     test_label = as.factor(labels[fold,])
-     set = cbind(train_feature,train_label)
-     
-     fit = lda(train_label ~ ., data=set)
-     
-     predict_label = predict(fit,test_feature)
-     print(predict_label)
-     error = sum(predict_label == test_label)/length(test_label)
-     fold_errors = c(fold_errors,error)
-     print(paste0('This is fold', i))
-     i = i+1
-     return(fold_errors)
-  }
-```
+
 
 ```{r}
 fitControl <- trainControl(## 10-fold CV
