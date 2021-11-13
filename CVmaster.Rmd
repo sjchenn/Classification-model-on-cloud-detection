@@ -1,0 +1,116 @@
+---
+title: "CVmaster"
+author: "Qin He"
+date: "10/31/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# this is example
+```{r}
+library(randomForest)
+library(datasets)
+library(caret)
+data<-iris
+str(data)
+data$Species <- as.factor(data$Species)
+set.seed(222)
+ind <- sample(2, nrow(data), replace = TRUE, prob = c(0.7, 0.3))
+train <- data[ind==1,]
+test <- data[ind==2,]
+rf <- randomForest(Species~., data=train, proximity=TRUE)
+p1 <- predict(rf, train)
+predict(rf, test) == test$Species
+```
+
+```{r}
+CVmaster = function(classifier,features,labels,nfold = 5){
+  #fitControl <- trainControl(## 5-fold CV
+                           #method = "cv",
+                           #number = nfold)
+  folds <- createFolds(labels[[1]], k = nfold)
+  fold_errors = c()
+  i = 1
+  if (classifier=='lda'){
+   for(fold in folds){
+     train_feature = features[-fold,]
+     test_feature = features[fold,]
+     train_label = as.factor(labels[-fold,])
+     test_label = as.factor(labels[fold,])
+     set = cbind(train_feature,train_label)
+     t = cbind(test_feature,test_label)
+     modellda = lda(train_label ~ ., data=set)
+     predict_label = predict(modellda,newdata=t)
+     print(length(predict_label$class))
+     error = 1- (sum(predict_label$class == test_label))/length(test_label)
+     fold_errors = c(fold_errors,error)
+     print(paste0('This is fold ', i))
+     i = i+1
+  }
+  return(fold_errors)
+  }
+  
+  if (classifier=='ridge'){
+    power =seq(-2,-1,by=0.1)
+    lambdalist = 10^power
+    for (fold in folds){
+      train_feature = data.matrix(features[-fold,])
+      test_feature = data.matrix(features[fold,])
+      train_label = as.factor(labels[-fold,])
+      test_label = as.factor(labels[fold,])
+      for (l in lambdalist){
+        model = glmnet(train_feature,train_label,family=c('binomial'),
+                  alpha=0,lambda=l,standardize =TRUE)
+        predict = predict(model,newx=test_feature,s=l,type='response')
+        predict = ifelse(predict>0.5,1,0)
+        ridgeerror = 1- (sum(predict == test_label)/length(test_label))
+        fold_errors = c(fold_errors,ridgeerror)
+      }
+      return(fold_errors)
+    }
+  }
+}
+```
+
+```{r}
+
+                           ## repeated ten times
+                           #repeats = 10)
+gbmFit1 <- train(Species ~ ., data = train, 
+                 method = "gbm", 
+                 trControl = fitControl,
+                 ## This last option is actually one
+                 ## for gbm() that passes through
+                 verbose = FALSE)
+```
+
+```{r}
+gbmFit1$results$Accuracy
+```
+
+```{r}
+CVmaster = function(classifier,data,nfold = 10){
+  fitControl <- trainControl(## 10-fold CV
+                           method = "cv",
+                           number = nfold,
+                           )
+  #training_data = cbind(features,labels)
+  gbmFit1 <- train(Species ~ ., data = data, 
+                 method = classifier, 
+                 trControl = fitControl,
+                 ## This last option is actually one
+                 ## for gbm() that passes through
+                 verbose = FALSE)
+  return(mean(gbmFit1$results$Accuracy))
+}
+CV_loss =CVmaster("gbm",train,5)
+```
+
+```{r}
+
+```
+
