@@ -43,6 +43,7 @@ image <- rbind(image1,image2,image3)
 
 
 ## (b)
+
 According to the heat map, we can observe patterns between xy coordinates and expert labels. The majority of unlabeled pixels are around x coordinates near 300. Furthermore, we can clearly see that the closer the geological location of the pixels are, they are more likely to share same label. Therefore, our assumption of independent and identical distributed doesn't hold for this data set. 
 ```{r}
 #summarize the data
