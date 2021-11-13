@@ -18,6 +18,8 @@ library(glmnet)
 library(corrplot)
 library(pROC)
 library(xgboost)
+library(MASS)
+library(class)
 ```
 
 
@@ -63,7 +65,6 @@ ggplot(data=image,aes(x=x,y=y,fill=expert_labels))+
 ```
 Among all eight feature correlation, we found that there are seven pairs correlations between features are higher than $0.7$. 
 ```{r}
-
 imagefeature <- image %>% 
   dplyr::select(NDAI,SD,CORR,DF,CF,BF,AF,AN)
 feature_cor <- cor(imagefeature)
@@ -341,29 +342,26 @@ mini_data
 
 
 ```{r}
-set.seed(521)
-fitControl <- trainControl(## 10-fold CV
-                           method = "cv",
-                           number = 10
-                           )
-svm_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data, 
-                 method = "svmLinear", 
-                 trControl = fitControl,
-                 tuneGrid = expand.grid(C = seq(0.2, 2, length = 5)),
-                 preProcess = c("center","scale"))
+# set.seed(521)
+# fitControl <- trainControl(## 10-fold CV
+#                            method = "cv",
+#                            number = 10
+#                            )
+# svm_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data, 
+#                  method = "svmLinear", 
+#                  trControl = fitControl,
+#                  tuneGrid = expand.grid(C = seq(0.2, 2, length = 5)),
+#                  preProcess = c("center","scale"))
 ```
 
 ```{r}
-summary(svm_fit)
-svm_fit$results
-predict_val = predict(svm_fit,newdata = test_data)
-sum(predict_val == test_data$expert_labels)/nrow(test_data)
+# summary(svm_fit)
+# svm_fit$results
+# predict_val = predict(svm_fit,newdata = test_data)
+# sum(predict_val == test_data$expert_labels)/nrow(test_data)
 ```
 
-```{r}
-validation_data$expert_labels
-predict_val
-```
+
 ```{r}
 control <- trainControl(method='repeatedcv', 
                         number=10, 
@@ -387,17 +385,17 @@ plot(rf_fit)
 ```
 
 ```{r}
-control <- trainControl(method='cv', 
-                        number=10, 
-                        repeats=3,
-                        search = 'random')
-rf_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data, 
-                 method = "nnet", 
-                 metric = 'Accuracy',
-                   #tuneLength  = 15, 
-                  trControl = control
-              #  linout = T
-                )
+# control <- trainControl(method='cv', 
+#                         number=10, 
+#                         repeats=3,
+#                         search = 'random')
+# rf_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data, 
+#                  method = "nnet", 
+#                  metric = 'Accuracy',
+#                    #tuneLength  = 15, 
+#                   trControl = control
+#               #  linout = T
+#                 )
 ```
 
 
@@ -412,53 +410,48 @@ sum(predicted == test_data$expert_labels)/nrow(test_data)
 
 ```{r}
 #try lda and qda on the whole dataset
-data$expert_labels <- ifelse(data$expert_labels==1,1,0)
-data <- data%>%mutate(block_y = ((y-1)%%10)+1,block_x = ((x-64)%%10)+1)%>%mutate(block_index = (block_y-1)*10+block_x)
-table(data$block_index)
-train_index = sample(1:100,80)
-train_data = data%>%filter(block_index %in% train_index)
-test_data = data%>%filter(!(block_index %in% train_index))
-validation_index = sample(train_index,10)
-validation_data = train_data%>%filter(block_index %in%validation_index)
+# data$expert_labels <- ifelse(data$expert_labels==1,1,0)
+# data <- data%>%mutate(block_y = ((y-1)%%10)+1,block_x = ((x-64)%%10)+1)%>%mutate(block_index = (block_y-1)*10+block_x)
+# table(data$block_index)
+# train_index = sample(1:100,80)
+# train_data = data%>%filter(block_index %in% train_index)
+# test_data = data%>%filter(!(block_index %in% train_index))
+# validation_index = sample(train_index,10)
+# validation_data = train_data%>%filter(block_index %in%validation_index)
 ```
 
-```{r}
-fitControl <- trainControl(## 10-fold CV
-                           method = "cv",
-                           number = 10
-                           )
-train_data$expert_labels <- as.factor(train_data$expert_labels)
-lda_fit <- train(expert_labels ~ NDAI + SD + CORR, data = train_data, 
-                 method = "lda", 
-                 trControl = fitControl,
-                 #tuneGrid = expand.grid(C = seq(0.2, 2, length = 5)),
-                 preProcess = c("center","scale"))
+```{r ldanocv}
+# fitControl <- trainControl(## 10-fold CV
+#                            method = "cv",
+#                            number = 10
+#                            )
+# train_data$expert_labels <- as.factor(train_data$expert_labels)
+# lda_fit <- train(expert_labels ~ NDAI + SD + CORR, data = train_data, 
+#                  method = "lda", 
+#                  trControl = fitControl,
+#                  #tuneGrid = expand.grid(C = seq(0.2, 2, length = 5)),
+#                  preProcess = c("center","scale"))
 
 ```
 
-```{r}
-lda_fit
+```{r qdanocv}
+# fitControl <- trainControl(## 10-fold CV
+#                            method = "cv",
+#                            number = 10,
+#                            repeats = 3
+#                            )
+# test_data$expert_labels <- as.factor(test_data$expert_labels)
+# train_data$expert_labels <- as.factor(train_data$expert_labels)
+# qda_fit <- train(expert_labels ~ NDAI + SD + CORR, data = train_data, 
+#                  method = "qda", 
+#                  trControl = fitControl,
+#                  #tuneGrid = expand.grid(C = seq(0.2, 2, length = 5)),
+#                  preProcess = c("center","scale"))
 ```
 
-
-```{r}
-fitControl <- trainControl(## 10-fold CV
-                           method = "cv",
-                           number = 10,
-                           repeats = 3
-                           )
-test_data$expert_labels <- as.factor(test_data$expert_labels)
-train_data$expert_labels <- as.factor(train_data$expert_labels)
-qda_fit <- train(expert_labels ~ NDAI + SD + CORR, data = train_data, 
-                 method = "qda", 
-                 trControl = fitControl,
-                 #tuneGrid = expand.grid(C = seq(0.2, 2, length = 5)),
-                 preProcess = c("center","scale"))
-```
-
-```{r}
-rs <- predict(qda_fit,test_data)
-sum(rs == test_data$expert_labels)/ nrow(test_data)
+```{r qda assess test error}
+# rs <- predict(qda_fit,test_data)
+# sum(rs == test_data$expert_labels)/ nrow(test_data)
 ```
 
 ## b ROC curves
@@ -548,50 +541,37 @@ errors
 plot(errors,type = "l")
 ```
 
-```{r}
-train_data
-```
+```{r experiment on neural network}
+# library(keras)
+# #library(EBImage)
+# library(stringr)
+# library(pbapply)
+# library(tensorflow)
+# use_condaenv("keras-tf", required = T)
+# train_array %>%
+# layer_dropout(rate = 0.25) %>%
+# layer_flatten() %>%
+# layer_dense(units = 50, activation = "relu") %>%
+# layer_dropout(rate = 0.25) %>%
+# layer_dense(units = 1, activation = "sigmoid")
+# import tensorflow as tf
 
+# # load library
+# require(neuralnet)
+# 
+# # fit neural network
+# nn=neuralnet(expert_labels ~ NDAI + SD + CORR,data=train_data, hidden=3,act.fct = "logistic",
+#                 linear.output = T)
 
-```{r}
-library(keras)
-#library(EBImage)
-library(stringr)
-library(pbapply)
-library(tensorflow)
-use_condaenv("keras-tf", required = T)
-train_array %>%
-layer_dropout(rate = 0.25) %>%
-layer_flatten() %>%
-layer_dense(units = 50, activation = "relu") %>%
-layer_dropout(rate = 0.25) %>%
-layer_dense(units = 1, activation = "sigmoid")
-```
-
-
-```{python}
-import tensorflow as tf
-```
-```{r}
-# load library
-require(neuralnet)
-
-# fit neural network
-nn=neuralnet(expert_labels ~ NDAI + SD + CORR,data=train_data, hidden=3,act.fct = "logistic",
-                linear.output = T)
-```
-
-```{r}
-plot(nn)
-pred = compute(nn,test_data)
-prob = pred$net.result[,2]
-pred =ifelse(prob>0.5, 1, 0)
-sum(pred == test_data$expert_labels)/length(test_data$expert_labels)
+# plot(nn)
+# pred = compute(nn,test_data)
+# prob = pred$net.result[,2]
+# pred =ifelse(prob>0.5, 1, 0)
+# sum(pred == test_data$expert_labels)/length(test_data$expert_labels)
 ```
 
 
 ```{r cv master function}
-library(MASS)
 CVmaster = function(classifier,features,labels,nfold = 5){
   #fitControl <- trainControl(## 5-fold CV
                            #method = "cv",
@@ -636,16 +616,53 @@ CVmaster(classifier='lda', features=features, labels=labels,nfold=5)
 labels
 ```
 
+# Ridge regression with tuned lambda
+```{r}
+error_ridge = CVmaster(classifier='ridge', features=features, labels=labels,nfold=5)
+```
 
+```{r}
+power =seq(-2,-1,by=0.1)
+lambdalist = 10^power
+lambdalist[which.min(error_ridge)]
+```
 
+```{r ridge cv visualize}
+ridgedt = as.data.frame(cbind(lambdalist,error_ridge))
+theme_update(plot.title = element_text(hjust = 0.5))
+ggplot(data=ridgedt, aes(x=lambdalist,y=error_ridge))+
+  labs(x='Lambda',y='Average Test Error Rate')+
+  geom_line()+
+  ggtitle('Average Test Error Acorss All Folds with Different Lambda Values')
+```
+According to the tuning result, we will obtain lowest test error when we have our $\lambda$ sets to $0.01$. We now perform ridge regression again after parameter tuning. The misclassification error rate for ridge regression is approximately 11.14%.
 
+```{r}
+ridge.train = data.matrix(train_data[,4:7])
+ridge.label = train_data$expert_labels
+ridge.model = glmnet(ridge.train,ridge.label,family=c('binomial'),
+                  alpha=0,lambda=0.01,standardize =TRUE)
+```
+
+The assumptions for ridge regression remains the same as OLS except we are not requiring the distribution of error to be a guassian distribution. 
+We need to check for linearity, constant variance and independence. We can simply fit an model on logistic regression and check assumptions there.
+
+```{r}
+logistic.model = glm(expert_labels~NDAI+SD+CORR+DF,data=train_data,family=c('binomial'))
+par(mfrow=c(2,2))
+plot(logistic.model)
+```
+Confusion Matrix:
+```{r}
+ridge.predict = predict(ridge.model,newx=data.matrix(test_data[,4:7]),type='response')
+ridge.predict = ifelse(ridge.predict<0.5,0,1)
+confusionMatrix(as.factor(test_data$expert_labels),as.factor(ridge.predict))
+```
 
 # KNN 
 
 ## knn with selected 4 features 
 ```{r}
-library(class)
-
 # knn data rescale
 train_knn = scale(train_data[,4:7],center = TRUE,scale = TRUE)
 test_knn = scale(test_data[,4:7],center = TRUE,scale = TRUE)
@@ -656,8 +673,8 @@ sum(knn.26 == test_data$expert_labels)/length(test_data$expert_labels)
 
 
 cv_knn = function(train,label,k = 5,nfold = 5){
-  folds <- createFolds(label, k = nfold, list = TRUE, returnTrain = FALSE)
-  errors = c()
+  #folds <- createFolds(label, k = nfold, list = TRUE, returnTrain = FALSE)
+  #fold_errors = c()
   idx = 1
   for(fold in folds){
     train_curr = train[-fold,]
@@ -687,12 +704,12 @@ for(fold in folds){
 mean(errors)
 
 ks = c(1:10)
-cv_erros = c()
+cv_errors = c()
 for(k in ks){
   error = cv_knn(train_knn,train_labels,k = k,nfold = 5)
-  cv_erros =c(cv_erros,error)
+  cv_errors =c(cv_errors,error)
 }
-plot(cv_erros,)
+plot(cv_errors,)
 
 
 ```
