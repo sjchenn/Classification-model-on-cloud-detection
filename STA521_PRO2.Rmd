@@ -17,6 +17,7 @@ library(caret)
 library(glmnet)
 library(corrplot)
 library(pROC)
+library(xgboost)
 ```
 
 
@@ -24,9 +25,10 @@ library(pROC)
 
 ```{r}
 #load data
-image1 <- read.csv('imagem1.txt',sep='',header=FALSE)
+image1 <- as.data.frame(read.csv('imagem1.txt',sep='',header=FALSE))
 image2 <- read.csv('imagem2.txt', sep='',header=FALSE)
 image3 <- read.csv('imagem3.txt', sep='',header=FALSE)
+
 
 vcol <- c('y','x','expert_labels','NDAI','SD','CORR','DF','CF','BF','AF','AN')
 
@@ -139,6 +141,8 @@ specificdf %>%
 ```{r}
 df <- rbind(image1,image2,image3)
 data = df%>%filter(expert_labels != 0)
+
+typeof(df)
 ```
 
 
@@ -185,24 +189,19 @@ test_data = data%>%filter(!(block_index %in% train_index))
 validation_index = sample(train_index,10)
 validation_data = train_data%>%filter(block_index %in%validation_index)
 
-summary(data$x)
-
-x = as.numeric(data$y)
-
-cbind(floor(sort(x)/38),sort(x))
-
-sort(unique(data$block_y))
+table(train_data$expert_labels)
 ```
 
 
 
 # b 
 ```{r}
+test_data
 # test classifications error 
-sum(test_data$expert_labels == -1)/length(test_data$expert_labels)
+1 - sum(test_data$expert_labels == 0)/length(test_data$expert_labels)
 # validation classifications error
-sum(validation_data$expert_labels == -1)/length(test_data$expert_labels)
-1 - sum(validation_data$expert_labels == -1)/length(test_data$expert_labels)
+sum(validation_data$expert_labels == 0)/length(validation_data$expert_labels)
+1 - sum(validation_data$expert_labels == 0)/length(validation_data$expert_labels)
 ```
 
 # c
@@ -268,11 +267,19 @@ fitControl <- trainControl(## 5-fold CV
 ## a
 ```{r}
 #run logistic on the whole training dataset using block train test split
+<<<<<<< Updated upstream
 log_fit <- train(as_factor(expert_labels) ~ NDAI + SD + CORR + DF, data = train_data, 
+=======
+train_data$expert_labels = as.factor(train_data$expert_labels)
+log_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data, 
+>>>>>>> Stashed changes
                  method = "glm", 
                  trControl = fitControl,
                  family = "binomial"
                  )
+summary(log_fit)
+predicted <- predict(log_fit,test_data)
+sum(predicted == test_data$expert_labels)/length(test_data$expert_labels)
 ```
 
 
@@ -343,7 +350,9 @@ library(randomForest)
 rf_fit <- randomForest(expert_labels ~ NDAI + SD +CORR + DF , data = train_data, ntree = 20, mtry = 4, importance = T)
 plot(rf_fit)
 
+
 ```
+
 ```{r}
 control <- trainControl(method='cv', 
                         number=10, 
@@ -480,6 +489,7 @@ coords(test_logit_roc, "best", ret = "threshold")
 test_logit_roc$thresholds[which.max(test_logit_roc$specificities+test_logit_roc$sensitivities)]
 ```
 
+<<<<<<< Updated upstream
 Confusion matrix for logistics regression is:
 ```{r}
 confusionMatrix(as.factor(test_data$expert_labels),as.factor(test_logit_pred))
@@ -487,4 +497,84 @@ confusionMatrix(as.factor(test_data$expert_labels),as.factor(test_logit_pred))
 
 
 
+=======
+
+```{r}
+sparse_matrix <- sparse.model.matrix(expert_labels ~ NDAI + SD + CORR ~ .-1, data = train_data)
+```
+```{r}
+params = list(
+  booster="gbtree",
+  eta=0.001,
+  max_depth=5,
+  gamma=3,
+  subsample=0.75,
+  colsample_bytree=1,
+  objective="multi:softprob",
+  eval_metric="mlogloss",
+  num_class=2
+)
+xgb.train = xgb.DMatrix(data=as.matrix(train_data[,4:7]),label=train_data$expert_labels)
+xgb.test = xgb.DMatrix(data=as.matrix(test_data[,4:7]),label=test_data$expert_labels)
+xgb <- xgboost(data = as.matrix(train_data[,4:7]), 
+ label = as.numeric(train_data$expert_labels), 
+ eta = 0.1,
+ max_depth = 15, 
+ nround=25, 
+ subsample = 0.5,
+ colsample_bytree = 0.5,
+ seed = 1,
+ eval_metric = "error",
+ objective = "binary:logistic",
+ nthread = 1
+)
+(train_data$expert_labels)
+dim(train_data[,4:7])
+length(train_data$expert_labels)
+```
+
+```{r}
+y_pred <- predict(xgb, data.matrix(test_data[4:7]))
+y_pred[y_pred >0.5] = 1
+y_pred[y_pred <= 0.5] = 0
+sum(y_pred == test_data$expert_labels)/length(test_data$expert_labels)
+```
+
+
+```{r}
+library(keras)
+#library(EBImage)
+library(stringr)
+library(pbapply)
+library(tensorflow)
+use_condaenv("keras-tf", required = T)
+train_array %>%
+layer_dropout(rate = 0.25) %>%
+layer_flatten() %>%
+layer_dense(units = 50, activation = "relu") %>%
+layer_dropout(rate = 0.25) %>%
+layer_dense(units = 1, activation = "sigmoid")
+```
+
+
+```{python}
+import tensorflow as tf
+```
+```{r}
+# load library
+require(neuralnet)
+
+# fit neural network
+nn=neuralnet(expert_labels ~ NDAI + SD + CORR,data=train_data, hidden=3,act.fct = "logistic",
+                linear.output = T)
+```
+
+```{r}
+plot(nn)
+pred = compute(nn,test_data)
+prob = pred$net.result[,2]
+pred =ifelse(prob>0.5, 1, 0)
+sum(pred == test_data$expert_labels)/length(test_data$expert_labels)
+```
+>>>>>>> Stashed changes
 
