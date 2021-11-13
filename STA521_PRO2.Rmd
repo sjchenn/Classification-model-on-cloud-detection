@@ -423,6 +423,11 @@ t = test_data %>%
 
 ```
 
+```{r}
+#cv master for ridge regression 
+CVmaster(classifier='ridge', features=features, labels=labels,nfold=5)
+```
+
 
 
 ```{r}
@@ -467,4 +472,11 @@ confusionMatrix(as.factor(test_data$expert_labels),as.factor(test_logit_pred))
 
 
 
+```{r}
+set.seed(521)
+#change purchase to 0,1
+caravan.boost = gbm(Purchase~.,data=caravan.train,
+                    shrinkage = 0.01, n.trees= 1000)
+summary.gbm(caravan.boost)
+```
 
