@@ -45,6 +45,7 @@ image <- rbind(image1,image2,image3)
 
 
 ## (b)
+
 According to the heat map, we can observe patterns between xy coordinates and expert labels. The majority of unlabeled pixels are around x coordinates near 300. Furthermore, we can clearly see that the closer the geological location of the pixels are, they are more likely to share same label. Therefore, our assumption of independent and identical distributed doesn't hold for this data set. 
 ```{r}
 #summarize the data
@@ -450,6 +451,11 @@ fit = lda(train_label ~ ., data=set)
 t = test_data %>% 
   dplyr::select(-expert_labels)
 
+```
+
+```{r}
+#cv master for ridge regression 
+CVmaster(classifier='ridge', features=features, labels=labels,nfold=5)
 ```
 
 
