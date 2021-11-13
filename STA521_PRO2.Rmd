@@ -45,7 +45,6 @@ image <- rbind(image1,image2,image3)
 
 
 ## (b)
-
 According to the heat map, we can observe patterns between xy coordinates and expert labels. The majority of unlabeled pixels are around x coordinates near 300. Furthermore, we can clearly see that the closer the geological location of the pixels are, they are more likely to share same label. Therefore, our assumption of independent and identical distributed doesn't hold for this data set. 
 ```{r}
 #summarize the data
@@ -64,15 +63,17 @@ ggplot(data=image,aes(x=x,y=y,fill=expert_labels))+
 ```
 Among all eight feature correlation, we found that there are seven pairs correlations between features are higher than $0.7$. 
 ```{r}
+
 imagefeature <- image %>% 
-  select(NDAI,SD,CORR,DF,CF,BF,AF,AN)
+  dplyr::select(NDAI,SD,CORR,DF,CF,BF,AF,AN)
 feature_cor <- cor(imagefeature)
 for (i in 1:nrow(feature_cor)){
     correlations <-  which((abs(feature_cor[i,i:ncol(feature_cor)]) > 0.7) & (feature_cor[i,i:ncol(feature_cor)] != 1))
     if(length(correlations)> 0){
       lapply(correlations,FUN =  function(x) (cat(paste(colnames(feature_cor)[i], "with",colnames(feature_cor)[x]), "\n")))
     }
-  }
+}
+
 ```
 ### pairwise relationships between expert labels and individual features.
 
@@ -107,7 +108,7 @@ In addition, we want to see the differences between two classes (cloud,no cloud)
 ```{r}
 #specificdf only contains two classes and three features
 specificdf <- image %>% 
-  select(CORR,NDAI,SD,expert_labels) %>% 
+  dplyr::select(CORR,NDAI,SD,expert_labels) %>% 
   filter(expert_labels==1|expert_labels==-1)
 ```
 
@@ -142,7 +143,39 @@ specificdf %>%
 ```{r}
 df <- rbind(image1,image2,image3)
 data = df%>%filter(expert_labels != 0)
+cloud = data%>%filter(expert_labels == 1)
+nocloud = data%>%filter(expert_labels == 1)
 
+imagefeature <- image %>% 
+  dplyr::select(NDAI,SD,CORR,DF,CF,BF,AF,AN)
+feature_cor <- cor(imagefeature)
+for (i in 1:nrow(feature_cor)){
+    correlations <-  which((abs(feature_cor[i,i:ncol(feature_cor)]) > 0.9) & (feature_cor[i,i:ncol(feature_cor)] != 1))
+    if(length(correlations)> 0){
+      lapply(correlations,FUN =  function(x) (cat(paste(colnames(feature_cor)[i], "with",colnames(feature_cor)[x]), "\n")))
+    }
+}
+print("----------------")
+
+imagefeature <- cloud %>% 
+  dplyr::select(NDAI,SD,CORR,DF,CF,BF,AF,AN)
+feature_cor <- cor(imagefeature)
+for (i in 1:nrow(feature_cor)){
+    correlations <-  which((abs(feature_cor[i,i:ncol(feature_cor)]) > 0.9) & (feature_cor[i,i:ncol(feature_cor)] != 1))
+    if(length(correlations)> 0){
+      lapply(correlations,FUN =  function(x) (cat(paste(colnames(feature_cor)[i], "with",colnames(feature_cor)[x]), "\n")))
+    }
+}
+print("----------------")
+imagefeature <- nocloud %>% 
+  dplyr::select(NDAI,SD,CORR,DF,CF,BF,AF,AN)
+feature_cor <- cor(imagefeature)
+for (i in 1:nrow(feature_cor)){
+    correlations <-  which((abs(feature_cor[i,i:ncol(feature_cor)]) > 0.9) & (feature_cor[i,i:ncol(feature_cor)] != 1))
+    if(length(correlations)> 0){
+      lapply(correlations,FUN =  function(x) (cat(paste(colnames(feature_cor)[i], "with",colnames(feature_cor)[x]), "\n")))
+    }
+}
 typeof(df)
 ```
 
@@ -191,6 +224,10 @@ validation_index = sample(train_index,10)
 validation_data = train_data%>%filter(block_index %in%validation_index)
 
 table(train_data$expert_labels)
+
+train_data$expert_labels = as.factor(train_data$expert_labels)
+test_data$expert_labels = as.factor(test_data$expert_labels)
+validation_data$expert_labels = as.factor(validation_data$expert_labels)
 ```
 
 
@@ -268,12 +305,8 @@ fitControl <- trainControl(## 5-fold CV
 ## a
 ```{r}
 #run logistic on the whole training dataset using block train test split
-<<<<<<< Updated upstream
-log_fit <- train(as_factor(expert_labels) ~ NDAI + SD + CORR + DF, data = train_data, 
-=======
 train_data$expert_labels = as.factor(train_data$expert_labels)
 log_fit <- train(expert_labels ~ NDAI + SD + CORR + DF, data = train_data, 
->>>>>>> Stashed changes
                  method = "glm", 
                  trControl = fitControl,
                  family = "binomial"
@@ -331,7 +364,6 @@ sum(predict_val == test_data$expert_labels)/nrow(test_data)
 validation_data$expert_labels
 predict_val
 ```
-
 ```{r}
 control <- trainControl(method='repeatedcv', 
                         number=10, 
@@ -404,60 +436,9 @@ lda_fit <- train(expert_labels ~ NDAI + SD + CORR, data = train_data,
 
 ```
 
-```{r cv master function}
-library(MASS)
-CVmaster = function(classifier,features,labels,nfold = 5){
-  #fitControl <- trainControl(## 5-fold CV
-                           #method = "cv",
-                           #number = nfold)
-  folds <- createFolds(labels[[1]], k = nfold)
-  fold_errors = c()
-  i = 1
-  if (classifier=='lda'){
-   for(fold in folds){
-     train_feature = features[-fold,]
-     test_feature = features[fold,]
-     train_label = as.factor(labels[-fold,])
-     test_label = as.factor(labels[fold,])
-     set = cbind(train_feature,train_label)
-     t = cbind(test_feature,test_label)
-     modellda = lda(train_label ~ ., data=set)
-     predict_label = predict(modellda,newdata=t)
-     print(length(predict_label$class))
-     error = 1- (sum(predict_label$class == test_label))/length(test_label)
-     fold_errors = c(fold_errors,error)
-     print(paste0('This is fold ', i))
-     i = i+1
-  }
-  return(fold_errors)
-  }
-}
-```
-
-```{r for cv master}
-#cv master on lda regression
-traindata <- rbind(train_data,validation_data)
-features = traindata %>% 
-  dplyr::select(-expert_labels) %>% 
-  dplyr::select(NDAI,SD,CORR)
-labels = traindata %>% 
-  dplyr::select(expert_labels) 
-#labels = as.factor(labels[[1]])
-CVmaster(classifier='lda', features=features, labels=labels,nfold=5)
-```
 ```{r}
-set = cbind(train_feature,train_label)
-fit = lda(train_label ~ ., data=set)
-t = test_data %>% 
-  dplyr::select(-expert_labels)
-
+lda_fit
 ```
-
-```{r}
-#cv master for ridge regression 
-CVmaster(classifier='ridge', features=features, labels=labels,nfold=5)
-```
-
 
 
 ```{r}
@@ -482,33 +463,17 @@ sum(rs == test_data$expert_labels)/ nrow(test_data)
 
 ## b ROC curves
 ```{r}
-summary(log_fit)
-```
-
-```{r}
 #ROC for logistic
-test_logit_pred = predict(log_fit,newdata=test_data)
-logit.threshold = 0.5
-test_logit_roc = roc(factor(test_data$expert_labels,ordered=TRUE),
-                     factor(test_logit_pred,ordered = TRUE),plot=TRUE,print.auc=TRUE,print.thres = logit.threshold,main='ROC Curve for Logistic Regression')
-coords(test_logit_roc, "best", ret = "threshold")
-test_logit_roc$thresholds[which.max(test_logit_roc$specificities+test_logit_roc$sensitivities)]
+test_prob = predict(logit,)
 ```
 
-<<<<<<< Updated upstream
-Confusion matrix for logistics regression is:
-```{r}
-confusionMatrix(as.factor(test_data$expert_labels),as.factor(test_logit_pred))
-```
-
-
-
-=======
 
 ```{r}
 sparse_matrix <- sparse.model.matrix(expert_labels ~ NDAI + SD + CORR ~ .-1, data = train_data)
 ```
+
 ```{r}
+set.seed(521)
 params = list(
   booster="gbtree",
   eta=0.001,
@@ -523,20 +488,23 @@ params = list(
 xgb.train = xgb.DMatrix(data=as.matrix(train_data[,4:7]),label=train_data$expert_labels)
 xgb.test = xgb.DMatrix(data=as.matrix(test_data[,4:7]),label=test_data$expert_labels)
 xgb <- xgboost(data = as.matrix(train_data[,4:7]), 
- label = as.numeric(train_data$expert_labels), 
- eta = 0.1,
- max_depth = 15, 
- nround=25, 
+ label = as.numeric(train_data$expert_labels) - 1, 
+ eta = 0.01,
+ max_depth = 4, 
+ nround=50, 
  subsample = 0.5,
- colsample_bytree = 0.5,
+ colsample_bytree = 1,
  seed = 1,
  eval_metric = "error",
  objective = "binary:logistic",
- nthread = 1
+ nthread = 1,
+ verbose = T
 )
 (train_data$expert_labels)
 dim(train_data[,4:7])
 length(train_data$expert_labels)
+
+train_data
 ```
 
 ```{r}
@@ -544,6 +512,44 @@ y_pred <- predict(xgb, data.matrix(test_data[4:7]))
 y_pred[y_pred >0.5] = 1
 y_pred[y_pred <= 0.5] = 0
 sum(y_pred == test_data$expert_labels)/length(test_data$expert_labels)
+1 - sum(y_pred == test_data$expert_labels)/length(test_data$expert_labels)
+```
+
+```{r}
+plot(xgb$evaluation_log,type = "l")
+```
+
+
+
+```{r}
+set.seed(521)
+max_depths = c(1:15)
+errors = c()
+for(depths in max_depths){
+  xgb <- xgboost(data = as.matrix(train_data[,4:7]), 
+ label = as.numeric(train_data$expert_labels) - 1, 
+ eta = 0.5,
+ gamma = 1,
+ max_depth = depths, 
+ nround=50, 
+ subsample = 0.1,
+ colsample_bytree = 0.5,
+ eval_metric = "error",
+ objective = "binary:logistic",
+ verbose = F,
+ nthread = 1)
+  y_pred <- predict(xgb, data.matrix(test_data[4:7]))
+  y_pred[y_pred >0.5] = 1
+  y_pred[y_pred <= 0.5] = 0
+  error = 1 - sum(y_pred == test_data$expert_labels)/length(test_data$expert_labels)
+  errors = c(errors,error)
+}
+errors
+plot(errors,type = "l")
+```
+
+```{r}
+train_data
 ```
 
 
@@ -582,5 +588,116 @@ prob = pred$net.result[,2]
 pred =ifelse(prob>0.5, 1, 0)
 sum(pred == test_data$expert_labels)/length(test_data$expert_labels)
 ```
->>>>>>> Stashed changes
+
+
+```{r cv master function}
+library(MASS)
+CVmaster = function(classifier,features,labels,nfold = 5){
+  #fitControl <- trainControl(## 5-fold CV
+                           #method = "cv",
+                           #number = nfold)
+  folds <- createFolds(labels[[1]], k = nfold)
+  fold_errors = c()
+  i = 1
+  if (classifier=='lda'){
+   for(fold in folds){
+     train_feature = features[-fold,]
+     test_feature = features[fold,]
+     train_label = as.factor(labels[-fold,])
+     test_label = as.factor(labels[fold,])
+     train_set = cbind(train_feature,train_label)
+     t = cbind(test_feature,test_label)
+     modellda = lda(train_label ~ ., newdata=train_set)
+     predict_label = predict(modellda,data=t)
+     print(length(predict_label$class))
+     print(length(test_label))
+     error = (sum(predict_label$class == test_label))/length(test_label)
+     #print(predict_label$class )
+     #print(unique(test_label))
+     fold_errors = c(fold_errors,error)
+     print(paste0('This is fold', i))
+     i = i+1
+  }
+  return(fold_errors)
+  }
+}
+```
+
+```{r for cv master}
+#cv master on lda regression
+traindata <- rbind(train_data,validation_data)
+features = traindata %>% 
+  dplyr::select(-expert_labels) %>% 
+  dplyr::select(NDAI,SD,CORR)
+labels = traindata %>% 
+  dplyr::select(expert_labels) 
+#labels = as.factor(labels[[1]])
+CVmaster(classifier='lda', features=features, labels=labels,nfold=5)
+labels
+```
+
+
+
+
+
+# KNN 
+
+## knn with selected 4 features 
+```{r}
+library(class)
+
+# knn data rescale
+train_knn = scale(train_data[,4:7],center = TRUE,scale = TRUE)
+test_knn = scale(test_data[,4:7],center = TRUE,scale = TRUE)
+train_labels = train_data$expert_labels
+knn.26 <- knn(train=train_knn, test=test_knn, cl=train_data$expert_labels, k=26)
+
+sum(knn.26 == test_data$expert_labels)/length(test_data$expert_labels)
+
+
+cv_knn = function(train,label,k = 5,nfold = 5){
+  folds <- createFolds(label, k = nfold, list = TRUE, returnTrain = FALSE)
+  errors = c()
+  idx = 1
+  for(fold in folds){
+    train_curr = train[-fold,]
+    test_curr = train[fold,]
+    knn_curr = knn(train = train_curr,test = test_curr,cl = label[-fold],k = k)
+    error = 1- sum(knn_curr == label[fold])/length(label[fold])
+    errors = c(errors,error)
+    print(paste0("Fold ",idx,"in session"))
+    idx = idx + 1
+  }
+  return(mean(errors))
+  
+}
+
+cv_knn(train_knn,train_labels)
+
+folds <- createFolds(labels_knn, k = 10, list = TRUE, returnTrain = FALSE)
+
+errors = c()
+for(fold in folds){
+  train_curr = train_knn[-fold,]
+  test_curr = train_knn[fold,]
+  knn_curr = knn(train=train_curr, test=test_curr, cl=labels_knn[-fold], k=26)
+  error = 1- sum(knn_curr == labels_knn[fold])/length(labels_knn[fold])
+  errors = c(errors,error)
+}
+mean(errors)
+
+ks = c(1:10)
+cv_erros = c()
+for(k in ks){
+  error = cv_knn(train_knn,train_labels,k = k,nfold = 5)
+  cv_erros =c(cv_erros,error)
+}
+plot(cv_erros,)
+
+
+```
+## pca
+```{r}
+train_knn[1,]
+```
 
