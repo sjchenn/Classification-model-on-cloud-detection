@@ -665,7 +665,8 @@ cv_knn = function(train,label,k = 5,nfold = 5){
     knn_curr = knn(train = train_curr,test = test_curr,cl = label[-fold],k = k)
     error = 1- sum(knn_curr == label[fold])/length(label[fold])
     errors = c(errors,error)
-    print(paste0("Fold ",idx,"in session"))
+    print(paste0("Fold ",idx," in session"))
+    print(paste0("Fold error is ",error))
     idx = idx + 1
   }
   return(mean(errors))
@@ -692,12 +693,154 @@ for(k in ks){
   error = cv_knn(train_knn,train_labels,k = k,nfold = 5)
   cv_erros =c(cv_erros,error)
 }
-plot(cv_erros,)
+plot(ks,cv_erros,type = "l",main = "KNN test loss",ylab = "Test loss", xlab = "Choice of K")
 
 
 ```
 ## pca
 ```{r}
-train_knn[1,]
+library(stats)
+set.seed(521)
+pca_data = scale(train_data[,4:11],scale = T,center = T)
+pca = prcomp(pca_data)
+pca$x
+
+
+
+#select first 4 pcs 
+pca_dataset = pca$x[,1:4]
+#xgboost
+xgb <- xgboost(data = as.matrix(pca_dataset), 
+ label = as.numeric(train_data$expert_labels) - 1, 
+ eta = 1,
+ max_depth = 4, 
+ nround=200, 
+ subsample = 0.5,
+ colsample_bytree = 0.5,
+ seed = 1,
+ eval_metric = "error",
+ objective = "binary:logistic",
+ nthread = 1,
+ verbose = T
+)
+# form pca test set
+pca_data_test = scale(test_data[,4:11],scale = T,center = T)
+test_pca = prcomp(pca_data_test)$x
+test_pca_dataset = test_pca[,1:4]
+
+y_pred <- predict(xgb, test_pca_dataset)
+y_pred <- ifelse(y_pred > 0.5,1,0)
+sum(y_pred == test_data$expert_labels)/length(test_data$expert_labels)
+1 - sum(y_pred == test_data$expert_labels)/length(test_data$expert_labels)
+
+
+
+# use first four features(conclusion from eda)
+xgb <- xgboost(data = as.matrix(train_data[,4:7]), 
+ label = as.numeric(train_data$expert_labels) - 1, 
+ eta = 1,
+ max_depth = 4, 
+ nround=50, 
+ subsample = 0.5,
+ colsample_bytree = 0.5,
+ seed = 1,
+ eval_metric = "error",
+ objective = "binary:logistic",
+ nthread = 1,
+ early_stop_rounds = 3,
+ verbose = T
+)
+xgb
+y_pred <- predict(xgb, data.matrix(test_data[,4:7]))
+y_pred <- ifelse(y_pred > 0.5,1,0)
+sum(y_pred == test_data$expert_labels)/length(test_data$expert_labels)
+1 - sum(y_pred == test_data$expert_labels)/length(test_data$expert_labels)
+
+
+## knn 
+cv_knn(pca_dataset,train_labels)
+cv_knn(train_knn,train_labels)
+```
+
+## tuning for xgboost
+
+
+# 1 
+min_child_weight:minimum sum of weights of all observations required in a child
+If the tree partition step results in a leaf node with the sum of instance weight less than min_child_weight, then the building process will give up further partitioning. Alternatively, it can be viewed as a commend for algorithm to stop split when node reach a certain level of purity. An useful reference post \:https://stats.stackexchange.com/questions/317073/explanation-of-min-child-weight-in-xgboost-algorithm
+
+max_depth: maximium depth of a tree can get
+
+Both of these two parameters prevent overfiting by stop tree splitting at certain level. Hence, they are tuned toghter here.
+
+
+
+```{r}
+set.seed(521)
+cv_xgboost = function(train_data,label,max_depth = 4,min_child = 1,nfold = 5){
+  folds <- createFolds(label, k = nfold, list = TRUE, returnTrain = FALSE)
+  errors = c()
+  for(fold in folds){
+    train_curr = train_data[-fold,]
+    test_curr = train_data[fold,]
+    label_curr = label[-fold]
+    xgb <- xgboost(data = train_curr, 
+      label = label_curr, 
+      eta = 1,
+      max_depth = max_depth, 
+      min_child_weight = min_child,
+      nround=50, 
+      subsample = 0.5,
+      colsample_bytree = 0.5,
+      eval_metric = "error",
+      objective = "binary:logistic",
+      nthread = 1,
+      verbose = F
+    )
+    y_pred <- predict(xgb, data.matrix(test_curr))
+    y_pred <- ifelse(y_pred > 0.5,1,0)
+    error = 1-  sum(y_pred == label[fold])/length(label[fold])
+    errors = c(errors,error)
+  }
+  return(mean(errors))
+}
+
+cv_xgboost(train_data = data.matrix(train_data[,4:7]),label = as.numeric(train_data$expert_labels)-1)
+max_depth = c(3,5,7,9,11)
+min_child = c(1,3,5)
+
+res = c()
+for(d in max_depth){
+  for(c in min_child){
+    error = cv_xgboost(train_data = data.matrix(train_data[,4:7]),label = as.numeric(train_data$expert_labels)-1,max_depth = d,min_child = c)
+    res = c(res,error)
+    print(paste0("max depths: ",d," mini_child_weight: ",c," ",": ",error))
+  }
+}
+
+xgb <- xgboost(data = as.matrix(train_data[,4:7]), 
+      label = as.numeric(train_data$expert_labels) - 1, 
+      eta = 1,
+      max_depth = 3, 
+      min_child_weight = 5,
+      nround=50, 
+      subsample = 0.5,
+      colsample_bytree = 0.5,
+      eval_metric = "error",
+      objective = "binary:logistic",
+      nthread = 1,
+      verbose = T
+    )
+y_pred <- predict(xgb, data.matrix(test_data[,4:7]))
+y_pred <- ifelse(y_pred > 0.5,1,0)
+1 - sum(y_pred == test_data$expert_labels)/length(test_data$expert_labels)
+min(res)
+```
+
+
+# 2 gamma
+A node is split only when the resulting split gives a positive reduction in the loss function. Gamma specifies the minimum loss reduction required to make a split.
+```{r}
+
 ```
 
