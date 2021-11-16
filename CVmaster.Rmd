@@ -12,13 +12,15 @@ library(caret)
 ```
 
 ```{r}
-CVmaster = function(classifier,features,labels,nfold = 5){
+CVmaster = function(classifier,features,labels,nfold = 5,l=0.1,k=5){
+  set.seed(521)
   #fitControl <- trainControl(## 5-fold CV
                            #method = "cv",
                            #number = nfold)
   folds <- createFolds(labels[[1]], k = nfold)
   fold_errors = c()
-  #i = 1
+  fold_accuracy = c()
+  i = 1
   if (classifier=='lda'){
    for(fold in folds){
      train_feature = features[-fold,]
@@ -29,60 +31,61 @@ CVmaster = function(classifier,features,labels,nfold = 5){
      t = cbind(test_feature,test_label)
      modellda = lda(train_label ~ ., data=set)
      predict_label = predict(modellda,newdata=t)
-     print(length(predict_label$class))
-     error = 1- (sum(predict_label$class == test_label))/length(test_label)
-     fold_errors = c(fold_errors,error)
+     accuracy = sum(predict_label$class == test_label)/length(test_label)
+     fold_accuracy = c(fold_accuracy,accuracy)
      #print(paste0('This is fold ', i))
      #i = i+1
   }
-  return(fold_errors)
+  return(fold_accuracy)
   }
   
-  if (classifier=='ridge'){
-    power =seq(-2,-1,by=0.1)
-    lambdalist = 10^power
-    for (fold in folds){
-      train_feature = data.matrix(features[-fold,])
-      test_feature = data.matrix(features[fold,])
-      train_label = as.factor(labels[-fold,])
-      test_label = as.factor(labels[fold,])
-      for (l in lambdalist){
-        model = glmnet(train_feature,train_label,family=c('binomial'),
-                  alpha=0,lambda=l,standardize =TRUE)
-        predict = predict(model,newx=test_feature,s=l,type='response')
-        predict = ifelse(predict>0.5,1,0)
-        ridgeerror = 1- (sum(predict == test_label)/length(test_label))
-        fold_errors = c(fold_errors,ridgeerror)
-      }
-      return(fold_errors)
-    }
-  }
+  # if (classifier=='ridge'){
+  #   for (fold in folds){
+  #     train_feature = data.matrix(features[-fold,])
+  #     test_feature = data.matrix(features[fold,])
+  #     train_label = as.factor(labels[-fold,])
+  #     test_label = as.factor(labels[fold,])
+  #     model = glmnet(train_feature,train_label,family=c('binomial'),
+  #                 alpha=0,lambda=l,standardize =TRUE)
+  #     predict = predict(model,newx=test_feature,s=l,type='response')
+  #     predict = ifelse(predict>0.5,1,0)
+  #     ridgeerror = 1- (sum(predict == test_label)/length(test_label))
+  #     fold_errors = c(fold_errors,ridgeerror)
+  #     }
+  #     return(mean(fold_errors))
+  #   }
+
   
   if (classifier == 'knn'){
-    train_knn = scale(train_data[,4:7],center = TRUE,scale = TRUE)
-    test_knn = scale(test_data[,4:7],center = TRUE,scale = TRUE)
-    train_labels = train_data$expert_labels
-    cv_knn = function(train,test,k,nfold=5){
-      error = c()
-      for (fold in folds){
-        train_curr = train[-fold,]
-        test_curr = train[fold,]
-        knn_curr = knn(train = train_curr,test = test_curr,cl = label[-fold],k = k)
-        error = 1- sum(knn_curr == label[fold])/length(label[fold])
-        errors = c(errors,error)
-        print(paste0("Fold ",idx,"in session"))
-        idx = idx + 1
+    train_knn = scale(features,center = TRUE,scale = TRUE)
+    train_labels = labels
+    errors = c()
+    for (fold in folds){
+      train_curr = train_knn[-fold,]
+      test_curr = train_knn[fold,]
+      knn_curr = knn(train = train_curr,test = test_curr,cl = train_labels[-fold,],k = k)
+      error = 1- sum(knn_curr == train_labels[fold,])/length(labels[fold,])
+      errors = c(errors,error)
         }
-        return(mean(errors))
+     return(mean(errors))
     }
-      ks = 1:10
-      cv_errors = c()
-      for(k in ks){
-      error = cv_knn(train_knn,train_labels,k = k,nfold = 5)
-      cv_errors =c(cv_errors,error)}
-      }
-    
+
   
+  # if (classifier == 'logistic'){
+  #   for(fold in folds){
+  #    train_feature = features[-fold,]
+  #    test_feature = features[fold,]
+  #    train_label = as.factor(labels[-fold,])
+  #    test_label = as.factor(labels[fold,])
+  #    set = cbind(train_feature,train_label)
+  #    modellogit = glm(train_label~.,data=set,family='binomial')
+  #    predict_label = predict(modellogit,newdata=test_feature,type='response')
+  #    predict_label= ifelse(predict_label>0.5,1,0)
+  #    accuracy = (sum(predict_label == test_label))/length(test_label)
+  #    fold_accuracy = c(accuracy,fold_accuracy)
+  # }
+  # return(fold_accuracy)
+  # }
 }
 ```
 
