@@ -177,7 +177,7 @@ validation_datab$expert_labels = as.factor(validation_datab$expert_labels)
 ```
 
 ## (b) Trivial classifier
-### split along 
+### split along y
 ```{r}
 # test classifications error
 1 - sum(test_datay$expert_labels == 0)/length(test_datay$expert_labels)
@@ -375,25 +375,39 @@ lda_b
 
 ## knn on y split data
 ```{r}
+train_data = rbind(train_data,validation_data)
+train_knn = scale(train_data[,4:7],center = TRUE,scale = TRUE)
+test_knn = scale(test_data[,4:7],center = TRUE,scale = TRUE)
+train_labels = train_data$expert_labels
 ks = c(1,5,9,10,13,15,20,25,30,35)
-cv_knn_y = c()
+cv_errors = c()
 for(k in ks){
-  error = CVmaster('knn',features=featuresy, labels=labelsy,k = k,nfold = 5)
-  cv_knn_y =c(cv_knn_y,error)
+  error = knn_cv(data.matrix(train_data[,4:7]),train_labels,nfold = 5,k = k)
+  cv_errors =c(cv_errors,mean(error))
 }
+
+knn_along_y <- plot(ks,cv_errors,type = "l",main = "KNN CV loss",ylab = "Test Loss", xlab = "Choice of K")
+
 ```
 
-Plot for knn error
+## knn on block data
 ```{r}
-knndt = as.data.frame(cbind(ks,cv_knn_y))
-theme_update(plot.title = element_text(hjust = 0.5))
-ggplot(data=knndt,aes(x=ks,y=cv_knn_y))+
-  geom_line()+
-  ggtitle('CV Test Error Versus Neighbour Number Under Split Along Y')+
-  xlab('Neighbour Size')+
-  ylab('Test Error Across All Folds')+
-  labs(captions='Fig 3.2')
+train_data = rbind(train_data,validation_data)
+train_knn = scale(train_data[,4:7],center = TRUE,scale = TRUE)
+test_knn = scale(test_data[,4:7],center = TRUE,scale = TRUE)
+train_labels = train_data$expert_labels
+ks = c(1,5,9,10,13,15,20,25,30,35)
+cv_errors = c()
+for(k in ks){
+  error = knn_cv(data.matrix(train_data[,4:7]),train_labels,nfold = 5,k = k)
+  cv_errors =c(cv_errors,mean(error))
+}
+
+knn_along_block <- plot(ks,cv_errors,type = "l",main = "KNN CV loss",ylab = "Test Loss", xlab = "Choice of K")
+
 ```
+
+
 ## (b) ROC curve on train set
 ## ROC curve on logistic under block split 
 ```{r}
@@ -454,6 +468,7 @@ train_lda_roc = roc(factor(traindatab$expert_labels,ordered=TRUE),
 
 
 
+
 ## Confusion Matrix
 ### Logistic
 ```{r}
@@ -470,7 +485,33 @@ lda_prob = predict(lda_b,newdata=test_datab)$class
 confusionMatrix(as.factor(test_datab$expert_labels),as.factor(lda_prob))
 ```
 
+## KNN
+```{r}
+knn.best <- knn(train_knn,test_knn,cl = train_labels,k = 25)
+confusionMatrix(as.factor(test_data$expert_labels),as.factor(knn.best))
+```
 
+## XGboost
+
+```{r}
+xgb <- xgboost(data = as.matrix(train_data[,4:7]), 
+      label = as.numeric(train_data$expert_labels) - 1, 
+      eta = 0.1,
+      max_depth = 3, 
+      min_child_weight = 7,
+      nround=50, 
+      subsample = 0.5,
+      colsample_bytree = 0.5,
+      eval_metric = "error",
+      objective = "binary:logistic",
+      nthread = 1,
+      verbose = T,
+    )
+y_pred <- predict(xgb, data.matrix(test_data[,4:7]))
+y_pred <- ifelse(y_pred > 0.5,1,0)
+1 - sum(y_pred == test_data$expert_labels)/length(test_data$expert_labels)
+confusionMatrix(as.factor(y_pred),as.factor(test_data$expert_labels)) 
+```
 
 # Diagnostics
 ## Linear Assumption 

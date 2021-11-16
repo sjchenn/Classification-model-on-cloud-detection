@@ -202,16 +202,6 @@ validation_index = sample(train_index,1)
 validation_data = train_data%>%filter(block_x %in%validation_index)
 
 
-# block separation
-data = df%>%filter(expert_labels != 0)
-data$expert_labels = ifelse(data$expert_labels==1,1,0)
-data <- data%>%mutate(block_y = ((y-1)%%10)+1,block_x = ((x-64)%%10)+1)%>%mutate(block_index = (block_y-1)*10+block_x)
-table(data$block_index)
-train_index = sample(1:100,80)
-train_data = data%>%filter(block_index %in% train_index)
-test_data = data%>%filter(!(block_index %in% train_index))
-validation_index = sample(train_index,10)
-validation_data = train_data%>%filter(block_index %in%validation_index)
 
 
 # block separation
@@ -498,7 +488,7 @@ xgb <- xgboost(data = as.matrix(train_data[,4:7]),
 dim(train_data[,4:7])
 length(train_data$expert_labels)
 
-train_data
+
 ```
 
 ```{r}
@@ -672,22 +662,51 @@ confusionMatrix(as.factor(test_data$expert_labels),as.factor(ridge.predict))
 
 ## knn with selected 4 features 
 ```{r}
+set.seed(521)
 # knn data rescale
+train_data = rbind(train_data,validation_data)
 train_knn = scale(train_data[,4:7],center = TRUE,scale = TRUE)
 test_knn = scale(test_data[,4:7],center = TRUE,scale = TRUE)
 train_labels = train_data$expert_labels
 
-ks = c(1:10)
+knn_cv = function(train_data,train_label,nfold = 5,k = 5,seed = 521){
+  set.seed(521)
+  train_knn = scale(train_data,center = TRUE,scale = TRUE)
+  folds <- createFolds(train_label, k = nfold)
+  errors = c()
+  idx = 1
+  for (fold in folds){
+      train_curr = train_knn[-fold,]
+      test_curr = train_knn[fold,]
+      knn_curr = knn(train = train_curr,test = test_curr,cl = train_label[-fold],k = k)
+      error = 1- sum(knn_curr == train_label[fold])/length(train_label[fold])
+      errors = c(errors,error)
+      print(paste0("fold ",idx," in session"))
+      idx = idx + 1
+  }
+  return(errors)
+}
+knn_cv(data.matrix(train_data[,4:7]),train_labels,nfold = 2)
+
+train_labels[1]
+
+
+ks = c(1,5,9,10,13,15,20,25,30,35)
 cv_errors = c()
 for(k in ks){
-  error = CVmaster('knn',features=features, labels=labels,k = k,nfold = 5)
-  cv_errors =c(cv_errors,error)
+  error = knn_cv(data.matrix(train_data[,4:7]),train_labels,nfold = 5,k = k)
+  cv_errors =c(cv_errors,mean(error))
 }
 
-#plot(ks,cv_erros,type = "l",main = "KNN test loss",ylab = "Test loss", xlab = "Choice of K")
+knn_block <- plot(ks,cv_errors,type = "l",main = "KNN CV loss",ylab = "Test Loss", xlab = "Choice of K")
 
+ks[which.min(cv_errors)]
+knn_cv(data.matrix(train_data[,4:7]),train_labels,nfold = 5,k = 25)
 
-
+mean(c(0.04917028,0.04855765,0.05111336,0.05183528,0.05156616))
+knn.best <- knn(train_knn,test_knn,cl = train_labels,k = 25)
+1-sum(knn.best == test_data$expert_labels)/length(knn.best)
+confusionMatrix(as.factor(test_data$expert_labels),as.factor(knn.best))
 ```
 ## pca
 ```{r}
@@ -812,21 +831,22 @@ for(d in max_depth){
 
 xgb <- xgboost(data = as.matrix(train_data[,4:7]), 
       label = as.numeric(train_data$expert_labels) - 1, 
-      eta = 1,
+      eta = 0.1,
       max_depth = 3, 
-      min_child_weight = 5,
+      min_child_weight = 7,
       nround=50, 
       subsample = 0.5,
       colsample_bytree = 0.5,
       eval_metric = "error",
       objective = "binary:logistic",
       nthread = 1,
-      verbose = T
+      verbose = T,
     )
 y_pred <- predict(xgb, data.matrix(test_data[,4:7]))
 y_pred <- ifelse(y_pred > 0.5,1,0)
 1 - sum(y_pred == test_data$expert_labels)/length(test_data$expert_labels)
 min(res)
+confusionMatrix(as.factor(y_pred),as.factor(test_data$expert_labels)) 
 ```
 
 
@@ -839,6 +859,7 @@ explainer_1 <- explain_xgboost(xgb,
 })
 
 ```
+
 ```{r}
 xgb.plot.tree(model = xgb,trees = 49)
 ```
