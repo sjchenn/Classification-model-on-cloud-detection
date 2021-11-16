@@ -4,6 +4,63 @@ author: "Qin He"
 date: "10/31/2021"
 output: pdf_document
 ---
+
+
+# Helper Function
+
+```{r}
+knn_cv = function(train_data,train_label,nfold = 5,k = 5){
+  train_knn = scale(train_data,center = TRUE,scale = TRUE)
+  folds <- createFolds(train_label, k = nfold)
+  errors = c()
+  idx = 1
+  for (fold in folds){
+      train_curr = train_knn[-fold,]
+      test_curr = train_knn[fold,]
+      knn_curr = knn(train = train_curr,test = test_curr,cl = train_label[-fold],k = k)
+      error = 1- sum(knn_curr == train_label[fold])/length(train_label[fold])
+      errors = c(errors,error)
+      print(paste0("fold ",idx," in session"))
+      idx = idx + 1
+  }
+  return(errors)
+}
+```
+
+
+```{r}
+xgboost_cv = function(train_data,label,max_depth = 4,min_child = 1,nfold = 5,niter = 50){
+  folds <- createFolds(label, k = nfold, list = TRUE, returnTrain = FALSE)
+  errors = c()
+  for(fold in folds){
+    train_curr = train_data[-fold,]
+    test_curr = train_data[fold,]
+    label_curr = label[-fold]
+    xgb <- xgboost(data = train_curr, 
+      label = label_curr, 
+      eta = 1,
+      max_depth = max_depth, 
+      min_child_weight = min_child,
+      nround=niter, 
+      subsample = 0.5,
+      colsample_bytree = 0.5,
+      eval_metric = "error",
+      objective = "binary:logistic",
+      nthread = 1,
+      verbose = F
+    )
+    y_pred <- predict(xgb, data.matrix(test_curr))
+    y_pred <- ifelse(y_pred > 0.5,1,0)
+    error = 1-  sum(y_pred == label[fold])/length(label[fold])
+    errors = c(errors,error)
+  }
+  return(errors)
+}
+```
+
+
+
+
 # CV master function
 ```{r}
 library(randomForest)
@@ -12,8 +69,8 @@ library(caret)
 ```
 
 ```{r}
-CVmaster = function(classifier,features,labels,nfold = 5,l=0.1,k=5){
-  set.seed(521)
+CVmaster = function(classifier,features,labels,nfold = 5,l=0.1,k=5,max_depth = 4,min_child = 1,seed = 521,niter = 50){
+  set.seed(seed)
   #fitControl <- trainControl(## 5-fold CV
                            #method = "cv",
                            #number = nfold)
@@ -57,18 +114,11 @@ CVmaster = function(classifier,features,labels,nfold = 5,l=0.1,k=5){
 
   
   if (classifier == 'knn'){
-    train_knn = scale(features,center = TRUE,scale = TRUE)
-    train_labels = labels
-    errors = c()
-    for (fold in folds){
-      train_curr = train_knn[-fold,]
-      test_curr = train_knn[fold,]
-      knn_curr = knn(train = train_curr,test = test_curr,cl = train_labels[-fold,],k = k)
-      error = 1- sum(knn_curr == train_labels[fold,])/length(labels[fold,])
-      errors = c(errors,error)
-        }
-     return(mean(errors))
-    }
+    return(knn_cv(features,labels,k = k,nfold = nfold))
+  }
+  if(classifier == "xgboost"){
+    return(xgboost_cv(featurs,labels,max_depth = max_depth,min_child = min_child,niter = niter))
+  }
 
   
   # if (classifier == 'logistic'){
