@@ -1,0 +1,521 @@
+---
+title: "Cleaned_PRO2"
+author: "Sijie Chen"
+date: "11/14/2021"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(tidyverse)
+library(reshape)
+library(GGally)
+library(DiscriMiner)
+library(gridExtra)
+library(caret)
+library(glmnet)
+library(corrplot)
+library(pROC)
+library(xgboost)
+library(MASS)
+library(class)
+```
+
+#1 Data Collection and Exploration
+## (b)
+```{r}
+image1 <- read.csv('imagem1.txt',sep='',header=FALSE)
+image2 <- read.csv('imagem2.txt', sep='',header=FALSE)
+image3 <- read.csv('imagem3.txt', sep='',header=FALSE)
+vcol <- c('y','x','expert_labels','NDAI','SD','CORR','DF','CF','BF','AF','AN')
+image <- rbind(image1,image2,image3)
+colnames(image) = vcol
+```
+
+According to the heat map, we can observe patterns between xy coordinates and expert labels. The majority of unlabeled pixels are around x coordinates near 300. Furthermore, we can clearly see that the closer the geological location of the pixels are, they are more likely to share same label. Therefore, our assumption of independent and identical distributed doesn't hold for this data set.
+```{r}
+table(image$expert_labels)
+ggplot(data=image,aes(x=x,y=y,fill=expert_labels))+
+  geom_tile()+
+  ggtitle('Heat Map With Exexpert Labels')+
+  labs(caption='Figure 1.1')
+```
+
+```{r}
+table(image$expert_labels)
+```
+
+## (c)
+### pairwise relationships among features
+```{r}
+image %>% 
+  dplyr::select(NDAI,SD,CORR,DF,CF,BF,AF,AN) %>% 
+  ggpairs()+
+  labs(captions='Fig 1.2')
+```
+
+We printed out pairs of feature correlation higher than 70%.
+```{r}
+imagefeature <- image %>% 
+  dplyr::select(NDAI,SD,CORR,DF,CF,BF,AF,AN)
+feature_cor <- cor(imagefeature)
+for (i in 1:nrow(feature_cor)){
+    correlations <-  which((abs(feature_cor[i,i:ncol(feature_cor)]) > 0.7) & (feature_cor[i,i:ncol(feature_cor)] != 1))
+    if(length(correlations)> 0){
+      lapply(correlations,FUN =  function(x) (cat(paste(colnames(feature_cor)[i], "with",colnames(feature_cor)[x]), "\n")))
+    }
+}
+```
+### pairwise relationship among labels and features
+We suspects that the underlying relationship between expert labels and individual features are not linear. For better estimation on correlation between continuous variable and categorical variable, we used correlation ration. According to the quantitative result, NDAI and CORR have highest correlation with expert labels. SD together with radiance angle AF and AN approximately have equal correlation with expert labels that is around $0.15$.
+```{r}
+for (i in 1:ncol(imagefeature)){
+  print(corRatio(imagefeature[,i],image$expert_labels))
+}
+```
+
+According to visualization, distribution of features with highest five correlation ratio under three labels are distinct meaning those features are valuable when we creating the model. 
+```{r}
+#change expertlabels into factors
+image <- image %>% 
+  mutate(expertlabels=as.factor(expert_labels))
+#visualization on correlations
+g1 <- ggplot(image,aes(x=NDAI,fill=expert_labels))+
+    geom_density(alpha=0.3)
+g2 <- ggplot(image,aes(x=SD,fill=expert_labels))+
+    geom_density(alpha=0.3)
+g3 <- ggplot(image,aes(x=CORR,fill=expert_labels))+
+    geom_density(alpha=0.3)
+g4 <- ggplot(image,aes(x=AF,fill=expert_labels))+
+    geom_density(alpha=0.3)+
+    labs(captions='Fig 1.2')
+g5 <- ggplot(image,aes(x=AN,fill=expert_labels))+
+    geom_density(alpha=0.3)
+grid.arrange(g1,g2,g3,g4,g5,ncol=2)
+```
+```{r}
+#specificdf only contains two classes and three features
+specificdf <- image %>% 
+  dplyr::select(CORR,NDAI,SD,AF,DF,CF,AN,BF,expert_labels) %>% 
+  filter(expert_labels==1|expert_labels==-1)
+```
+
+```{r}
+sp1 <- ggplot(specificdf,aes(x=CORR))+
+  geom_density(alpha=0.3)
+sp11 <- sp1+facet_wrap(~expert_labels)
+sp2 <- ggplot(specificdf,aes(x=NDAI))+
+  geom_density(alpha=0.3)
+sp22 <- sp2+facet_wrap(expert_labels~.)
+sp3 <- ggplot(specificdf,aes(x=SD))+
+  geom_density(alpha=0.3)
+sp33 <- sp3+facet_wrap(expert_labels~.)
+sp4 <- ggplot(specificdf,aes(x=AF))+
+  geom_density(alpha=0.3)
+sp44 <- sp4+facet_wrap(expert_labels~.)
+sp5 <- ggplot(specificdf,aes(x=DF))+
+  geom_density(alpha=0.3)
+sp55 <- sp5+facet_wrap(expert_labels~.)
+sp6 <- ggplot(specificdf,aes(x=BF))+
+  geom_density(alpha=0.3)
+sp66 <- sp6+facet_wrap(expert_labels~.)
+sp7 <- ggplot(specificdf,aes(x=CF))+
+  geom_density(alpha=0.3)
+sp77 <- sp7+facet_wrap(expert_labels~.)
+sp8 <- ggplot(specificdf,aes(x=AN))+
+  geom_density(alpha=0.3)
+sp88 <- sp8+facet_wrap(expert_labels~.)+
+  labs(captions='Fig 1.2')
+
+
+grid.arrange(sp11,sp22,sp33,sp44,sp55,sp66,sp77,sp88)
+```
+
+```{r}
+#quant
+specificdf %>% 
+  group_by(expert_labels) %>% 
+  summarize(meanCORR = mean(CORR), meanNDAI= mean(NDAI), meanSD= mean(SD),
+            sdCORR = sd(CORR), sdNDAI= sd(NDAI), sdSD= sd(SD))
+```
+
+# 2 Preparation
+## (a) Data Split
+### First way split along y axis
+```{r}
+data = image%>%filter(expert_labels != 0)
+data$expert_labels = ifelse(data$expert_labels==1,1,0)
+```
+
+```{r}
+set.seed(521)
+datay <- data%>%mutate(block_y = ((y-1)%%10)+1)
+train_index = sample(1:10,8)
+train_datay = datay%>%filter(block_y %in% train_index)
+test_datay = datay%>%filter(!(block_y %in% train_index))
+validation_index = sample(train_index,1)
+validation_datay = datay%>%filter(block_y %in%validation_index)
+```
+
+### Second way split using blocks
+```{r}
+set.seed(521)
+# block separation
+datablock <- data%>%mutate(block_y = floor(y/39)+1,
+                           block_x = floor(x/31)-2)%>%
+                  mutate(block_index =(block_y-1)*10+block_x)
+
+train_index = sample(1:100,80)
+train_datab = datablock%>%filter(block_index %in% train_index)
+test_datab = datablock%>%filter(!(block_index %in% train_index))
+validation_index = sample(train_index,10)
+validation_datab = train_datab%>%filter(block_index %in%validation_index)
+train_datab$expert_labels = as.factor(train_datab$expert_labels)
+test_datab$expert_labels = as.factor(test_datab$expert_labels)
+validation_datab$expert_labels = as.factor(validation_datab$expert_labels)
+```
+
+## (b) Trivial classifier
+### split along 
+```{r}
+# test classifications error
+1 - sum(test_datay$expert_labels == 0)/length(test_datay$expert_labels)
+# validation classifications error
+1 - sum(validation_datay$expert_labels == 0)/length(validation_datay$expert_labels)
+```
+
+### block split
+```{r}
+# test classifications error
+1 - sum(test_datab$expert_labels == 0)/length(test_datab$expert_labels)
+# validation classifications error
+1 - sum(validation_datab$expert_labels == 0)/length(validation_datab$expert_labels)
+```
+
+## (c) First order importance
+In order to check important variables associated with expert_labels, we can use a logistic regression. 
+### split using blocks
+Single logit returns all coefficients' p value smaller than significant value. We decided to try a step wise logistic regression. 
+```{r}
+featuredf <- dplyr::select(train_datab,-c(x,y,block_y,block_x,block_index))
+logit <- glm(expert_labels~.,data=featuredf,family='binomial') 
+step <- stepAIC(logit,direction='backward')
+```
+
+```{r}
+step$anova
+```
+
+Plot for variable importance:
+```{r}
+theme_update(plot.title = element_text(hjust = 0.5))
+VI <- varImp(logit,scale=FALSE)
+ggplot(aes(x=rownames(VI),y=Overall),data=VI)+
+  geom_bar(stat='identity')+
+  xlab('Features')+
+  ylab('Variable Importance')+
+  labs(captions='Fig 2.1')+
+  ggtitle('Variable Importance Plot')
+```
+# 3 Modeling
+## logistic on y split data
+Assumptions: Logistic regression without svm method assumes the decision boundary to be a hyperplane. The underlying for binary variable expert_labels given all other features is a bernoulli distribution, and the collinearity among predictors should be minimized. 
+
+```{r}
+#merge train and validation 
+traindatay = rbind(train_datay,validation_datay)
+featuresy = traindatay %>% 
+  dplyr::select(-expert_labels) %>% 
+  dplyr::select(NDAI,SD,CORR,DF)
+labelsy = traindatay %>% 
+  dplyr::select(expert_labels) 
+
+fold_accuracy_logit = CVmaster(classifier='logistic',features=featuresy,labels=labelsy,nfold=5)
+1-fold_accuracy_logit 
+mean(fold_accuracy_logit)
+```
+
+```{r}
+#single fit
+logit_s1 = glm(expert_labels~NDAI+DF+CORR+SD,data=traindatay,
+               family='binomial')
+summary(logit_s1)
+anova(logit_s1,test='Chi')
+
+#calculating test accuracy at threshold 0.28
+value = predict(logit_s1,newdata=test_datay,type='response')
+result = ifelse(value<0.28,0,1)
+sum(result == test_datay$expert_labels)/length(result)
+```
+
+
+## logistic on block 
+```{r}
+traindatab = rbind(train_datab,validation_datab)
+featuresb = traindatab %>% 
+  dplyr::select(-expert_labels) %>% 
+  dplyr::select(NDAI,SD,CORR,DF)
+labelsb = traindatab %>% 
+  dplyr::select(expert_labels) 
+
+fold_accuracy_logit = CVmaster(classifier='logistic',features=featuresb,labels=labelsb,nfold=5)
+mean(fold_accuracy_logit)
+```
+
+```{r}
+#single fit
+logit_s2 = glm(expert_labels~NDAI+DF+CORR+SD,data=traindatab,
+               family='binomial')
+summary(logit_s2)
+anova(logit_s2,test='Chi')
+```
+
+## ridge on y split 
+```{r}
+cv_ridge_errors_y = c()
+
+
+for (l in lambdalist){
+  error = CVmaster(classifier='ridge', features=featuresy, labels=labelsy,nfold=5,l=l)
+  cv_ridge_errors_y =c(cv_ridge_errors_y,error)
+}
+```
+
+```{r}
+1- cv_ridge_errors_y
+mean(1- cv_ridge_errors_y)
+```
+
+## ridge on block split
+```{r}
+# tune lambda list 
+power =seq(-2,-1,by=0.1)
+lambdalist = 10^power
+
+cv_ridge_errors = c()
+
+
+for (l in lambdalist){
+  error = CVmaster(classifier='ridge', features=featuresb, labels=labelsb,nfold=5,l=l)
+  cv_ridge_errors =c(cv_ridge_errors,error)
+}
+```
+
+
+```{r}
+1-cv_ridge_errors
+mean(1-cv_ridge_errors)
+```
+
+## Plot for y split method cv errors versus different lambda values
+```{r}
+ridgedt = as.data.frame(cbind(lambdalist,cv_ridge_errors_y))
+theme_update(plot.title = element_text(hjust = 0.5))
+ggplot(data=ridgedt, aes(x=lambdalist,y=error_ridge))+
+  labs(x='Lambda',y='Average Test Error Rate')+
+  geom_line()+
+  ggtitle('Average Test Error Acorss All Folds with Different Lambda Values')+
+  labs(caption='Fig 3.1')
+```
+
+## Single ridge on y split with l=0.01
+```{r}
+ridge.train = data.matrix(train_datay[,4:7])
+ridge.label = train_datay$expert_labels
+ridge.model = glmnet(ridge.train,ridge.label,family=c('binomial'),
+                  alpha=0,lambda=0.01,standardize =TRUE)
+ridge.model
+```
+
+## Single ridge on block split with l=0.01
+```{r}
+ridge.train = data.matrix(train_datab[,4:7])
+ridge.label = train_datab$expert_labels
+ridge.model = glmnet(ridge.train,ridge.label,family=c('binomial'),
+                  alpha=0,lambda=0.01,standardize =TRUE)
+ridge.model
+```
+
+## lda on y split data
+Assumptions: Underlying data is guassian(each variable noramlly distributed), each attribute has same variance. 
+```{r}
+CVmaster(classifier='lda', features=featuresy, labels=labelsy,nfold=5)
+1-CVmaster(classifier='lda', features=featuresy, labels=labelsy,nfold=5)
+mean(1-CVmaster(classifier='lda', features=featuresy, labels=labelsy,nfold=5))
+```
+
+## lda on y split data without cv
+```{r}
+lda_set = cbind(featuresb,labelsb)
+lda_y = lda(expert_labels~.,data=lda_set)
+lda_y_predict = predict(lda_y,newdata=validation_datay,type='class')
+
+#test accuracy 
+sum(validation_datay$expert_labels == lda_y_predict$class) / length(lda_y_predict$class)
+```
+
+```{r}
+lda_y
+```
+
+## lda on block split with cv
+```{r}
+accuracy.lda = CVmaster(classifier='lda', features=featuresb, labels=labelsb,nfold=5)
+1-accuracy.lda
+mean(1-CVmaster(classifier='lda', features=featuresb, labels=labelsb,nfold=5))
+```
+
+## lda without cv under block split
+```{r}
+lda_set = cbind(featuresy,labelsy)
+lda_b = lda(expert_labels~.,data=lda_set)
+lda_b
+```
+
+## knn on y split data
+```{r}
+ks = c(1,5,9,10,13,15,20,25,30,35)
+cv_knn_y = c()
+for(k in ks){
+  error = CVmaster('knn',features=featuresy, labels=labelsy,k = k,nfold = 5)
+  cv_knn_y =c(cv_knn_y,error)
+}
+```
+
+Plot for knn error
+```{r}
+knndt = as.data.frame(cbind(ks,cv_knn_y))
+theme_update(plot.title = element_text(hjust = 0.5))
+ggplot(data=knndt,aes(x=ks,y=cv_knn_y))+
+  geom_line()+
+  ggtitle('CV Test Error Versus Neighbour Number Under Split Along Y')+
+  xlab('Neighbour Size')+
+  ylab('Test Error Across All Folds')+
+  labs(captions='Fig 3.2')
+```
+## (b) ROC curve on train set
+## ROC curve on logistic under block split 
+```{r}
+logit_s1 = glm(expert_labels~NDAI+DF+CORR+SD,data=traindatab,
+               family='binomial')
+logit_prob = predict(logit_s1,newdata=featuresb,type='response')
+```
+
+```{r}
+#logit.threshold = 0.5
+#print.thres = logit.threshold,
+train_logit_roc = roc(factor(traindatab$expert_labels,ordered=TRUE),
+                     logit_prob,plot=TRUE,
+                     print.auc=TRUE,
+                     print.thres = 0.5,
+                     main='ROC Curve for Logistic Regression')
+coords(train_logit_roc, "best", ret = "threshold")
+train_logit_roc$thresholds[which.max(train_logit_roc$specificities
+                                     +train_logit_roc$sensitivities)]
+```
+
+
+### ROC curve for lda under block split 
+```{r}
+lda_set = cbind(featuresb,labelsb)
+lda_b = lda(expert_labels~.,data=lda_set)
+
+lda_prob = predict(lda_b,newdata=traindatab)$posterior[,2]
+```
+
+```{r}
+train_lda_roc = roc(factor(traindatab$expert_labels,ordered=TRUE),
+                     lda_prob,plot=TRUE,
+                     print.auc=TRUE,
+                     print.thres = 0.5,
+                     main='ROC Curve for LDA')
+coords(train_lda_roc, "best", ret = "threshold")
+train_lda_roc$thresholds[which.max(train_lda_roc$specificities
+                                     +train_lda_roc$sensitivities)]
+```
+### Combined graph 
+```{r,fig.cap='Fig 4.1'}
+par(mfrow=c(1,2))
+
+train_logit_roc = roc(factor(traindatab$expert_labels,ordered=TRUE),
+                     logit_prob,plot=TRUE,
+                     print.auc=TRUE,
+                     print.thres = 0.5,
+                     main='ROC for Logistic Regression')
+
+train_lda_roc = roc(factor(traindatab$expert_labels,ordered=TRUE),
+                     lda_prob,plot=TRUE,
+                     print.auc=TRUE,
+                     print.thres = 0.5,
+                     main='ROC for LDA')
+```
+
+
+
+
+## Confusion Matrix
+### Logistic
+```{r}
+logit_s1 = glm(expert_labels~NDAI+DF+CORR+SD,data=traindatab,
+               family='binomial')
+logit_prob = predict(logit_s1,newdata=test_datab,type='response')
+logit_prob = ifelse(logit_prob<0.5,0,1)
+confusionMatrix(as.factor(test_datab$expert_labels),as.factor(logit_prob))
+```
+
+### LDA
+```{r}
+lda_prob = predict(lda_b,newdata=test_datab)$class
+confusionMatrix(as.factor(test_datab$expert_labels),as.factor(lda_prob))
+```
+
+
+
+# Diagnostics
+## Linear Assumption 
+### Underlying linear assumption
+```{r}
+logit_s1 = glm(expert_labels~NDAI+DF+CORR+SD,data=traindatab,
+               family='binomial')
+logit_minisample = features[sample(1:nrow(features),1000),]
+logit_prob = predict(logit_s1,newdata=logit_minisample,type='response')
+predictors = colnames(features)
+assumptiondt = cbind(logit_minisample,logit_prob) %>% 
+  mutate(logit = log(logit_prob/(1-logit_prob))) %>% 
+  gather(key = "predictors", value = "predictor.value", -logit)
+```
+
+```{r}
+theme_update(plot.title = element_text(hjust = 0.5))
+ggplot(assumptiondt, aes(logit, predictor.value))+
+  geom_point(size = 0.5, alpha = 0.5) +
+  geom_smooth(method = "loess") + 
+  theme_bw()+
+  facet_wrap(~predictors, scales = "free_y")+
+  labs(caption = 'Fig 5.1')+
+  ggtitle('Diagnostic Plot for Logistic Regression')
+```
+
+### influential values 
+```{r}
+library(broom)
+model.data <- augment(logit_s1) %>% 
+  mutate(index = 1:n())
+```
+
+```{r}
+d2 <- ggplot(model.data, aes(index, .std.resid)) + 
+  geom_point(aes(color = expert_labels, alpha = .5)) +
+  theme_bw()
+```
+```{r}
+model.data %>% 
+  filter(abs(.std.resid) > 3)
+```
+
+### multicollinear
+```{r}
+car::vif(logit_s1)
+```
+
