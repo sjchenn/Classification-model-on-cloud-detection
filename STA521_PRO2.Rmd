@@ -829,9 +829,50 @@ min(res)
 ```
 
 
-# 2 gamma
-A node is split only when the resulting split gives a positive reduction in the loss function. Gamma specifies the minimum loss reduction required to make a split.
 ```{r}
+explainer_1 <- explain_xgboost(xgb,
+                               data = as.matrix(train_data[,4:7]),
+                               y =  as.numeric(train_data$expert_labels) - 1,
+                               encode_function = function(data) {
+ as.matrix(createDummyFeatures(data))
+})
+
+```
+```{r}
+xgb.plot.tree(model = xgb,trees = 49)
+```
+
+
+# 2 lambda
+Although previous part does not signal a strong sign of overfitting, it is notable that xgboost allows adding straightforward regularized term just as in ridge or lasso. We believe it is meaningful to explore the performance of such regularization that is not commonly seen in my tree-based methods.
+```{r}
+lambda = c(1:10)
+res =c()
+for(l in lambda){
+  
+}
+```
+
+
+```{r}
+library("xgboost")
+library("DALEXtra")
+library("mlr")
+explainer_1 <- explain_xgboost(xgb, 
+                               data = train_data[,4:7],
+                               y = train_data$expert_labels,
+                               encode_function = function(data) {
+ as.matrix(createDummyFeatures(data))
+})
+explainer_1$data
+
+res = predict_parts(explainer_1, test_data[328,4:7])
+res
+plot(res)
+for(i in 2:nrow(test_data)){
+  res = cbind(res,predict_parts(explainer_1, test_data[i,4:7]))
+  print(i)
+}
 
 ```
 
