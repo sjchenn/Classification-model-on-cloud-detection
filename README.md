@@ -6,7 +6,7 @@ Classifier is a character string which specify the type of algorithm.\
 `knn`: K-nearest neighbors\
 `xgboost`: XGBoosting\
 `lda`: Linear discriminant analysis\
-`logistic`: Logistic Regression\
+`logistic`: Logistic Regression
 
 Features is a matrix training data for the model, but should not include the true labels
 
@@ -16,9 +16,10 @@ nfold is a positive number specifying the number of cross-validation set to be c
 
 The other inputs are used for hyperparameter tuning, and they are set with default value. If some of the hyperparameter are not used for a specific model, no input is needed.
 
-KNN:
+`KNN`:\
 k is a real number specifying number of nearest neighbor to use in KNN, with default value 5
-XGBoosting
+
+`XGBoosting`:\
 
 max_depth is a real number specifying maximum depth for trees in XGBoost,with default value 4
 
