@@ -157,6 +157,10 @@ train_datay = datay%>%filter(block_y %in% train_index)
 test_datay = datay%>%filter(!(block_y %in% train_index))
 validation_index = sample(train_index,1)
 validation_datay = datay%>%filter(block_y %in%validation_index)
+
+train_datab$expert_labels = as.factor(train_datab$expert_labels)
+test_datab$expert_labels = as.factor(test_datab$expert_labels)
+validation_datab$expert_labels = as.factor(validation_datab$expert_labels)
 ```
 
 ### Second way split using blocks
@@ -402,13 +406,47 @@ train_labels = train_datab$expert_labels
 ks = c(1,5,9,10,13,15,20,25,30,35)
 cv_errors = c()
 for(k in ks){
-  error = knn_cv(data.matrix(train_data[,4:7]),train_labels,nfold = 5,k = k)
+  error = CVmaster("knn",data.matrix(train_data[,4:7]),train_labels,nfold = 5,k = k)
   cv_errors =c(cv_errors,mean(error))
 }
 
 knn_along_block <- plot(ks,cv_errors,type = "l",main = "KNN CV loss",ylab = "Test Loss", xlab = "Choice of K")
 
 ```
+
+## xgbosst on y
+```{r}
+train_data = rbind(train_datay,validation_datay)
+max_depth = c(3,5,7,9,11)
+min_child = c(1,3,5)
+res = c()
+for(d in max_depth){
+  for(c in min_child){
+    error = CVmaster("xgboost", features = data.matrix(train_data[,4:7]),labels = as.numeric(train_data$expert_labels)-1,max_depth = d,min_child = c)
+    res = c(res,error)
+    print(paste0("max depths: ",d," mini_child_weight: ",c," ",": ",error))
+  }
+}
+```
+## xgvoost on block 
+```{r}
+train_data = rbind(train_datab,validation_datab)
+max_depth = c(3,5,7,9,11)
+min_child = c(1,3,5)
+train_data
+res = c()
+for(d in max_depth){
+  for(c in min_child){
+    error = CVmaster("xgboost", features = data.matrix(train_data[,4:7]),labels = as.numeric(train_data$expert_labels)-1,max_depth = d,min_child = c)
+    res = c(res,error)
+    print(paste0("max depths: ",d," mini_child_weight: ",c," ",": ",error))
+  }
+}
+```
+
+
+
+## xgboost on block 
 
 
 ## (b) ROC curve on train set
