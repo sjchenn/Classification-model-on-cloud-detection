@@ -118,7 +118,7 @@ CVmaster = function(classifier,features,labels,nfold = 5,l=0.1,k=5,max_depth = 4
     return(knn_cv(features,labels,k = k,nfold = nfold))
   }
   if(classifier == "xgboost"){
-    return(xgboost_cv(featurs,labels,max_depth = max_depth,min_child = min_child,niter = niter))
+    return(xgboost_cv(features,labels,max_depth = max_depth,min_child = min_child,niter = niter))
   }
 
   
