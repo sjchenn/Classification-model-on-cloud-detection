@@ -1,4 +1,6 @@
-# STA521_PRO2
+# STA521_Project 2
+Cloud Detection Model
+
 
 
 This project features a CVmaster function, which compute k-fold cross-validation for algorithms used in this project. It takes a character string `classifiers`,`features`,`labels`,`nfold`, and additional hyperparameters that can be tuned in some of the models as input.\
