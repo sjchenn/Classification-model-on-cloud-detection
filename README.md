@@ -23,7 +23,7 @@ k is a real number specifying number of nearest neighbor to use in KNN, with def
 
 max_depth is a real number specifying maximum depth for trees in XGBoost,with default value 4
 
-min_child is a real number specifying minimum weights a child needs before splitting in XGBoost,with default value 1
+min_child is a real number specifying minimum weights a child needs to be before splitting trees in XGBoost,with default value 1
 
 niter is a real number specifying number of runs for XGBoost
 
