@@ -158,9 +158,9 @@ test_datay = datay%>%filter(!(block_y %in% train_index))
 validation_index = sample(train_index,1)
 validation_datay = datay%>%filter(block_y %in%validation_index)
 
-train_datab$expert_labels = as.factor(train_datab$expert_labels)
-test_datab$expert_labels = as.factor(test_datab$expert_labels)
-validation_datab$expert_labels = as.factor(validation_datab$expert_labels)
+train_datay$expert_labels = as.factor(train_datay$expert_labels)
+test_datay$expert_labels = as.factor(test_datay$expert_labels)
+validation_datay$expert_labels = as.factor(validation_datay$expert_labels)
 ```
 
 ### Second way split using blocks
@@ -233,8 +233,7 @@ traindatay = rbind(train_datay,validation_datay)
 featuresy = traindatay %>% 
   dplyr::select(-expert_labels) %>% 
   dplyr::select(NDAI,SD,CORR,DF)
-labelsy = traindatay %>% 
-  dplyr::select(expert_labels) 
+labelsy = traindatay$expert_labels
 
 fold_accuracy_logit = CVmaster(classifier='logistic',features=featuresy,labels=labelsy,nfold=5)
 1-fold_accuracy_logit 
@@ -261,8 +260,7 @@ traindatab = rbind(train_datab,validation_datab)
 featuresb = traindatab %>% 
   dplyr::select(-expert_labels) %>% 
   dplyr::select(NDAI,SD,CORR,DF)
-labelsb = traindatab %>% 
-  dplyr::select(expert_labels) 
+labelsb = traindatab$expert_labels
 
 fold_accuracy_logit = CVmaster(classifier='logistic',features=featuresb,labels=labelsb,nfold=5)
 mean(fold_accuracy_logit)
@@ -279,6 +277,9 @@ anova(logit_s2,test='Chi')
 ## ridge on y split 
 ```{r}
 cv_ridge_errors_y = c()
+power =seq(-2,-1,by=0.1)
+lambdalist = 10^power
+
 
 
 for (l in lambdalist){
@@ -295,9 +296,6 @@ mean(1- cv_ridge_errors_y)
 ## ridge on block split
 ```{r}
 # tune lambda list 
-power =seq(-2,-1,by=0.1)
-lambdalist = 10^power
-
 cv_ridge_errors = c()
 
 
@@ -315,9 +313,9 @@ mean(1-cv_ridge_errors)
 
 ## Plot for y split method cv errors versus different lambda values
 ```{r}
-ridgedt = as.data.frame(cbind(lambdalist,cv_ridge_errors_y))
+ridgedt = as.data.frame(cbind(lambdalist,cv_ridge_errors))
 theme_update(plot.title = element_text(hjust = 0.5))
-ggplot(data=ridgedt, aes(x=lambdalist,y=error_ridge))+
+ggplot(data=ridgedt, aes(x=lambdalist,y=cv_ridge_errors))+
   labs(x='Lambda',y='Average Test Error Rate')+
   geom_line()+
   ggtitle('Average Test Error Acorss All Folds with Different Lambda Values')+
@@ -353,7 +351,7 @@ mean(1-CVmaster(classifier='lda', features=featuresy, labels=labelsy,nfold=5))
 ## lda on y split data without cv
 ```{r}
 lda_set = cbind(featuresb,labelsb)
-lda_y = lda(expert_labels~.,data=lda_set)
+lda_y = lda(labelsb~.,data=lda_set)
 lda_y_predict = predict(lda_y,newdata=validation_datay,type='class')
 
 #test accuracy 
@@ -474,7 +472,7 @@ train_logit_roc$thresholds[which.max(train_logit_roc$specificities
 ### ROC curve for lda under block split 
 ```{r}
 lda_set = cbind(featuresb,labelsb)
-lda_b = lda(expert_labels~.,data=lda_set)
+lda_b = lda(labelsb~.,data=lda_set)
 
 lda_prob = predict(lda_b,newdata=traindatab)$posterior[,2]
 ```
@@ -606,11 +604,12 @@ confusionMatrix(as.factor(y_pred),as.factor(test_datab$expert_labels))
 ## Linear Assumption 
 ### Underlying linear assumption
 ```{r}
-logit_s1 = glm(expert_labels~NDAI+DF+CORR+SD,data=traindatab,
+set = cbind(featuresb,labelsb)
+logit_s1 = glm(labelsb~NDAI+DF+CORR+SD,data=set,
                family='binomial')
-logit_minisample = features[sample(1:nrow(features),1000),]
+logit_minisample = featuresb[sample(1:nrow(featuresb),1000),]
 logit_prob = predict(logit_s1,newdata=logit_minisample,type='response')
-predictors = colnames(features)
+predictors = colnames(featuresb)
 assumptiondt = cbind(logit_minisample,logit_prob) %>% 
   mutate(logit = log(logit_prob/(1-logit_prob))) %>% 
   gather(key = "predictors", value = "predictor.value", -logit)
