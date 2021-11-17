@@ -392,10 +392,10 @@ knn_along_y <- plot(ks,cv_errors,type = "l",main = "KNN CV loss",ylab = "Test Lo
 
 ## knn on block data
 ```{r}
-train_data = rbind(train_data,validation_data)
-train_knn = scale(train_data[,4:7],center = TRUE,scale = TRUE)
-test_knn = scale(test_data[,4:7],center = TRUE,scale = TRUE)
-train_labels = train_data$expert_labels
+train_data = rbind(train_datab,validation_datab)
+train_knn = scale(train_datab[,4:7],center = TRUE,scale = TRUE)
+test_knn = scale(test_datab[,4:7],center = TRUE,scale = TRUE)
+train_labels = train_datab$expert_labels
 ks = c(1,5,9,10,13,15,20,25,30,35)
 cv_errors = c()
 for(k in ks){
@@ -466,7 +466,52 @@ train_lda_roc = roc(factor(traindatab$expert_labels,ordered=TRUE),
 ```
 
 
+## Roc Curve for KNN 
+```{r}
+set.seed(521)
+knn.best <- knn(train_knn,train_knn,cl = train_labels,k = 25)
+train_knn_roc = roc(factor(train_labels,ordered = TRUE),as.numeric(knn.best)-1,plot = TRUE,print.auc = TRUE,print.thres = 0.5,main = "ROC for KNN")
+```
 
+## ROC Curve for XGBoost
+```{r}
+set.seed(521)
+xgb.best <- xgboost(data = as.matrix(train_data[,4:7]), 
+      label = as.numeric(train_data$expert_labels) - 1, 
+      eta = 1,
+      max_depth = 3, 
+      min_child_weight = 7,
+      nround=50, 
+      subsample = 0.5,
+      colsample_bytree = 0.5,
+      eval_metric = "error",
+      objective = "binary:logistic",
+      nthread = 1,
+      verbose = T,
+    )
+y_pred <- predict(xgb.best,as.matrix(train_data[,4:7]))
+y_pred <- ifelse(y_pred > 0.5,1,0)
+train_xgb_roc = roc(factor(train_data$expert_labels,ordered = TRUE),y_pred,plot = TRUE,print.auc = TRUE,print.thres = 0.5,main = "ROC for XGBoost")
+```
+
+
+### Combined graph 
+```{r fig.height= 7,fig.width= 8}
+par(mfrow=c(2,2))
+train_logit_roc = roc(factor(traindatab$expert_labels,ordered=TRUE),
+                     logit_prob,plot=TRUE,
+                     print.auc=TRUE,
+                     print.thres = 0.5,
+                     main='ROC for Logistic Regression')
+
+train_lda_roc = roc(factor(traindatab$expert_labels,ordered=TRUE),
+                     lda_prob,plot=TRUE,
+                     print.auc=TRUE,
+                     print.thres = 0.5,
+                     main='ROC for LDA')
+train_knn_roc = roc(factor(train_labels,ordered = TRUE),as.numeric(knn.best)-1,plot = TRUE,print.auc = TRUE,main = "ROC for KNN")
+train_xgb_roc = roc(factor(train_data$expert_labels,ordered = TRUE),y_pred,plot = TRUE,print.auc = TRUE,print.thres = 0.5,main = "ROC for XGBoost")
+```
 
 
 ## Confusion Matrix
@@ -487,16 +532,19 @@ confusionMatrix(as.factor(test_datab$expert_labels),as.factor(lda_prob))
 
 ## KNN
 ```{r}
+set.seed(521)
 knn.best <- knn(train_knn,test_knn,cl = train_labels,k = 25)
-confusionMatrix(as.factor(test_data$expert_labels),as.factor(knn.best))
+confusionMatrix(as.factor(test_datab$expert_labels),as.factor(knn.best))
 ```
 
 ## XGboost
 
 ```{r}
+set.seed(521)
+train_data = rbind(train_datab,validation_datab)
 xgb <- xgboost(data = as.matrix(train_data[,4:7]), 
       label = as.numeric(train_data$expert_labels) - 1, 
-      eta = 0.1,
+      eta = 1,
       max_depth = 3, 
       min_child_weight = 7,
       nround=50, 
@@ -507,10 +555,10 @@ xgb <- xgboost(data = as.matrix(train_data[,4:7]),
       nthread = 1,
       verbose = T,
     )
-y_pred <- predict(xgb, data.matrix(test_data[,4:7]))
+y_pred <- predict(xgb, data.matrix(test_datab[,4:7]))
 y_pred <- ifelse(y_pred > 0.5,1,0)
-1 - sum(y_pred == test_data$expert_labels)/length(test_data$expert_labels)
-confusionMatrix(as.factor(y_pred),as.factor(test_data$expert_labels)) 
+1 - sum(y_pred == test_datab$expert_labels)/length(test_datab$expert_labels)
+confusionMatrix(as.factor(y_pred),as.factor(test_datab$expert_labels)) 
 ```
 
 # Diagnostics
@@ -560,3 +608,4 @@ model.data %>%
 car::vif(logit_s1)
 ```
 
+###
