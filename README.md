@@ -19,8 +19,7 @@ The other inputs are used for hyperparameter tuning, and they are set with defau
 `KNN`:\
 k is a real number specifying number of nearest neighbor to use in KNN, with default value 5
 
-`XGBoosting`:\
-
+`XGBoosting`: 
 max_depth is a real number specifying maximum depth for trees in XGBoost,with default value 4
 
 min_child is a real number specifying minimum weights a child needs to be before splitting trees in XGBoost,with default value 1
