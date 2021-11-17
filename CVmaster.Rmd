@@ -74,7 +74,7 @@ CVmaster = function(classifier,features,labels,nfold = 5,l=0.1,k=5,max_depth = 4
   #fitControl <- trainControl(## 5-fold CV
                            #method = "cv",
                            #number = nfold)
-  folds <- createFolds(labels[[1]], k = nfold)
+  folds <- createFolds(labels, k = nfold)
   fold_errors = c()
   fold_accuracy = c()
   i = 1
@@ -114,6 +114,7 @@ CVmaster = function(classifier,features,labels,nfold = 5,l=0.1,k=5,max_depth = 4
 
   
   if (classifier == 'knn'){
+    print(nfold)
     return(knn_cv(features,labels,k = k,nfold = nfold))
   }
   if(classifier == "xgboost"){
@@ -121,21 +122,21 @@ CVmaster = function(classifier,features,labels,nfold = 5,l=0.1,k=5,max_depth = 4
   }
 
   
-  # if (classifier == 'logistic'){
-  #   for(fold in folds){
-  #    train_feature = features[-fold,]
-  #    test_feature = features[fold,]
-  #    train_label = as.factor(labels[-fold,])
-  #    test_label = as.factor(labels[fold,])
-  #    set = cbind(train_feature,train_label)
-  #    modellogit = glm(train_label~.,data=set,family='binomial')
-  #    predict_label = predict(modellogit,newdata=test_feature,type='response')
-  #    predict_label= ifelse(predict_label>0.5,1,0)
-  #    accuracy = (sum(predict_label == test_label))/length(test_label)
-  #    fold_accuracy = c(accuracy,fold_accuracy)
-  # }
-  # return(fold_accuracy)
-  # }
+  if (classifier == 'logistic'){
+    for(fold in folds){
+     train_feature = features[-fold,]
+     test_feature = features[fold,]
+     train_label = as.factor(labels[-fold,])
+     test_label = as.factor(labels[fold,])
+     set = cbind(train_feature,train_label)
+     modellogit = glm(train_label~.,data=set,family='binomial')
+     predict_label = predict(modellogit,newdata=test_feature,type='response')
+     predict_label= ifelse(predict_label>0.5,1,0)
+     accuracy = (sum(predict_label == test_label))/length(test_label)
+     fold_accuracy = c(accuracy,fold_accuracy)
+  }
+  return(fold_accuracy)
+  }
 }
 ```
 
