@@ -20,6 +20,7 @@ library(pROC)
 library(xgboost)
 library(MASS)
 library(class)
+library(DiagrammeR)
 ```
 
 #1 Data Collection and Exploration
@@ -375,19 +376,21 @@ lda_b
 
 ## knn on y split data
 ```{r}
-train_data = rbind(train_data,validation_data)
+train_data = rbind(train_datay,validation_datay)
 train_knn = scale(train_data[,4:7],center = TRUE,scale = TRUE)
-test_knn = scale(test_data[,4:7],center = TRUE,scale = TRUE)
+test_knn = scale(test_datay[,4:7],center = TRUE,scale = TRUE)
 train_labels = train_data$expert_labels
 ks = c(1,5,9,10,13,15,20,25,30,35)
 cv_errors = c()
 for(k in ks){
-  error = knn_cv(data.matrix(train_data[,4:7]),train_labels,nfold = 5,k = k)
+  error = CVmaster("knn",data.matrix(train_data[,4:7]),train_labels,nfold = 5,k = k)
   cv_errors =c(cv_errors,mean(error))
 }
 
 knn_along_y <- plot(ks,cv_errors,type = "l",main = "KNN CV loss",ylab = "Test Loss", xlab = "Choice of K")
 
+dim(data.matrix(train_data[,4:7]))
+length(train_labels)
 ```
 
 ## knn on block data
@@ -608,4 +611,69 @@ model.data %>%
 car::vif(logit_s1)
 ```
 
-###
+
+### variable Importance block split 
+```{r}
+set.seed(521)
+train_data = rbind(train_datab,validation_datab)
+xgb.best.b <- xgboost(data = as.matrix(train_data[,4:7]), 
+      label = as.numeric(train_data$expert_labels) - 1, 
+      eta = 1,
+      max_depth = 3, 
+      min_child_weight = 7,
+      nround=50, 
+      subsample = 0.5,
+      colsample_bytree = 0.5,
+      eval_metric = "error",
+      objective = "binary:logistic",
+      nthread = 1,
+      verbose = T,
+    )
+importance_matrix.b <- xgb.importance(colnames(train_data[,4:7]), model = xgb.best.b)
+xgb.plot.importance(importance_matrix,rel_to_first = TRUE, xlab = "Relative importance")
+importance_matrix
+xgb.plot.tree(model = xgb.best.b, trees = 49)
+```
+### Variable Importance along y
+
+```{r}
+set.seed(521)
+train_data = rbind(train_datay,validation_datay)
+train_data$expert_labels = as.factor(train_data$expert_labels)
+xgb.best.y <- xgboost(data = as.matrix(train_data[,4:7]), 
+      label = as.numeric(train_data$expert_labels) - 1, 
+      eta = 1,
+      max_depth = 3, 
+      min_child_weight = 7,
+      nround=50, 
+      subsample = 0.5,
+      colsample_bytree = 0.5,
+      eval_metric = "error",
+      objective = "binary:logistic",
+      nthread = 1,
+      verbose = T,
+    )
+importance_matrix.y <- xgb.importance(colnames(train_data[,4:7]), model = xgb.best.y)
+xgb.plot.importance(importance_matrix,rel_to_first = TRUE, xlab = "Relative importance")
+importance_matrix
+xgb.plot.tree(model = xgb.best.y, trees = 49)
+
+```
+
+
+
+## combine importance plot 
+
+```{r fig.height= 5,fig.width=10}
+par(mfrow = c(1,2))
+xgb.plot.importance(importance_matrix.b,rel_to_first = TRUE, xlab = "Relative importance")
+xgb.plot.importance(importance_matrix.y,rel_to_first = TRUE, xlab = "Relative importance")
+```
+
+## combine decision tree
+```{r}
+par(mfrow = c(1,2))
+xgb.plot.tree(model = xgb.best.b, trees = 49)
+xgb.plot.tree(model = xgb.best.y, trees = 49)
+```
+
