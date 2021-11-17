@@ -31,10 +31,10 @@ min_child is a real number specifying minimum weights a child needs to be before
 
 niter is a real number specifying number of runs for XGBoost
 
-seed is a real number specifying random seed used, which keeps results of cross-validation reproducible. The default value is 521.
+seed is a real number specifying random seed used, which keeps results of cross-validation reproducible. The default value is 521
 
 `Ridge Regression`:\
-l is a real number controlling strength of constrains on the L2 norm of coefficients
+l is a real number controlling strength of constrains on the L2 norm of coefficients. The default value is 0.01.
 
 In addition to CVmaster, we provide separate cross-validation function for XGBoost and KNN which requires tuning on hyperparameters. If future users need to tune on hyperparameters not included in CVmaster, it is easier to make changes to individual cross-validation functions. 
 
