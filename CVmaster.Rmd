@@ -82,8 +82,8 @@ CVmaster = function(classifier,features,labels,nfold = 5,l=0.1,k=5,max_depth = 4
    for(fold in folds){
      train_feature = features[-fold,]
      test_feature = features[fold,]
-     train_label = as.factor(labels[-fold,])
-     test_label = as.factor(labels[fold,])
+     train_label = as.factor(labels[-fold])
+     test_label = as.factor(labels[fold])
      set = cbind(train_feature,train_label)
      t = cbind(test_feature,test_label)
      modellda = lda(train_label ~ ., data=set)
@@ -96,21 +96,21 @@ CVmaster = function(classifier,features,labels,nfold = 5,l=0.1,k=5,max_depth = 4
   return(fold_accuracy)
   }
   
-  # if (classifier=='ridge'){
-  #   for (fold in folds){
-  #     train_feature = data.matrix(features[-fold,])
-  #     test_feature = data.matrix(features[fold,])
-  #     train_label = as.factor(labels[-fold,])
-  #     test_label = as.factor(labels[fold,])
-  #     model = glmnet(train_feature,train_label,family=c('binomial'),
-  #                 alpha=0,lambda=l,standardize =TRUE)
-  #     predict = predict(model,newx=test_feature,s=l,type='response')
-  #     predict = ifelse(predict>0.5,1,0)
-  #     ridgeerror = 1- (sum(predict == test_label)/length(test_label))
-  #     fold_errors = c(fold_errors,ridgeerror)
-  #     }
-  #     return(mean(fold_errors))
-  #   }
+  if (classifier=='ridge'){
+    for (fold in folds){
+      train_feature = data.matrix(features[-fold,])
+      test_feature = data.matrix(features[fold,])
+      train_label = as.factor(labels[-fold])
+      test_label = as.factor(labels[fold])
+      model = glmnet(train_feature,train_label,family=c('binomial'),
+                  alpha=0,lambda=l,standardize =TRUE)
+      predict = predict(model,newx=test_feature,s=l,type='response')
+      predict = ifelse(predict>0.5,1,0)
+      ridgeerror = 1- (sum(predict == test_label)/length(test_label))
+      fold_errors = c(fold_errors,ridgeerror)
+      }
+      return(mean(fold_errors))
+    }
 
   
   if (classifier == 'knn'){
@@ -126,8 +126,8 @@ CVmaster = function(classifier,features,labels,nfold = 5,l=0.1,k=5,max_depth = 4
     for(fold in folds){
      train_feature = features[-fold,]
      test_feature = features[fold,]
-     train_label = as.factor(labels[-fold,])
-     test_label = as.factor(labels[fold,])
+     train_label = as.factor(labels[-fold])
+     test_label = as.factor(labels[fold])
      set = cbind(train_feature,train_label)
      modellogit = glm(train_label~.,data=set,family='binomial')
      predict_label = predict(modellogit,newdata=test_feature,type='response')
