@@ -1,9 +1,10 @@
 # STA521_Project 2
 Cloud Detection Model
 
-Authors:
-Sijie, Chen sijie.chen@duke.edu
-Qin, He he.qin@duke.edu
+## Authors
+
+* Sijie Chen (sijie.chen@duke.edu)
+* Qin He (he.qin@duke.edu)
 
 This project features a CVmaster function, which compute k-fold cross-validation for algorithms used in this project. It takes a character string `classifiers`,`features`,`labels`,`nfold`, and additional hyperparameters that can be tuned in some of the models as input.\
 `classifier` is a character string which specify the type of algorithm.\
